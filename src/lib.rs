@@ -1,4 +1,4 @@
-use pest::Parser;
+use pest::iterators::Pair;
 use pest_derive::Parser;
 
 #[derive(Parser)]
@@ -6,6 +6,20 @@ use pest_derive::Parser;
 pub struct LLVMParser;
 
 pub struct Module(Vec<Definition>);
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Module {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut iterator = pair.into_inner();
+        match iterator.next().unwrap().as_rule() {
+            Rule::gid => {
+                unreachable!();
+            }
+            _ => unreachable!(),
+        }
+    }
+}
 
 pub enum Linkage {
     Private,
@@ -31,6 +45,21 @@ pub enum Type {
 }
 
 pub struct Uid(String);
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Uid {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut iterator = pair.into_inner();
+        match iterator.next().unwrap().as_rule() {
+            Rule::gid => {
+                unreachable!();
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
 pub struct Gid(String);
 
 pub enum ParamAttr {
@@ -225,4 +254,26 @@ pub enum Definition {
         //(!name !N)*
         blocks: Vec<(String, Block)>,
     },
+    SourceFilename(String),
+    TargetDatalayout(String),
+    TargetTriple(String),
+    Attributes,
+    Metadata,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut iterator = pair.into_inner();
+        match iterator.next().unwrap().as_rule() {
+            Rule::function => {}
+            Rule::source_filename => {}
+            Rule::target_datalayout => {}
+            Rule::target_triple => {}
+            Rule::attributes => {}
+            Rule::metadata => {}
+            _ => unreachable!(),
+        }
+    }
 }

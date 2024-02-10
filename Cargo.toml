@@ -5,8 +5,6 @@ edition = "2021"
 authors = ["William Tange <will@tan.ge>"]
 license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 clang-sys = "1.7.0"
 clap = { version = "4.4.18", features = ["derive"] }

@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Box::new(std::fs::File::open(args.file)?)
     };
+
     {
         use pest::Parser;
         let code = std::io::read_to_string(&mut input)?;
