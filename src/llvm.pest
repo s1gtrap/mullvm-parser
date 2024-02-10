@@ -1,0 +1,260 @@
+//! LLVM IR parser
+//!
+//! Based on https://llvm.org/docs/LangRef.html (https://web.archive.org/web/20240120071938/https://llvm.org/docs/LangRef.html)
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | (";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE) }
+
+uint = @{ "0" | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
+int  = @{ uint | ("-" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
+
+id  = @{ (ASCII_ALPHANUMERIC | "_" | ".")+ }
+uid = @{ "%" ~ id }
+gid = @{ "@" ~ id }
+
+string = ${ "\"" ~ inner ~ "\"" }
+inner  = @{ char* }
+char   =  {
+    !("\"" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+module = { SOI ~ definition* ~ EOI }
+
+linkage = {
+    "private"
+  | "internal"
+  | "available_externally"
+  | "linkonce"
+  | "weak"
+  | "common"
+  | "appending"
+  | "extern_weak"
+  | "linkonce_odr"
+  | "weak_odr"
+  | "external"
+}
+
+cconv = {
+    "ccc"
+  | "fastcc"
+  | "coldcc"
+  | "ghccc"
+  | "cc 11"
+  | "anyregcc"
+  | "preserve_mostcc"
+  | "preserve_allcc"
+  | "cxx_fast_tlscc"
+  | "tailcc"
+  | "swiftcc"
+  | "swifttailcc"
+  | "cfguard_checkcc" // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64.
+}
+
+ty = { ("i1" | "i8" | "i16" | "i32" | "i64" | "void") ~ "*"* | "ptr" }
+
+param_attr = {
+    "zeroext"
+  | "signext"
+  | "inreg"
+  | "byval" ~ "(" ~ ty ~ ")"
+  | "byref" ~ "(" ~ ty ~ ")"
+  | "preallocated" ~ "(" ~ ty ~ ")"
+  | "inalloca" ~ "(" ~ ty ~ ")"
+  | "sret" ~ "(" ~ ty ~ ")"
+  | "elementtype" ~ "(" ~ ty ~ ")"
+  | "align" ~ (uint | "(" ~ uint ~ ")")
+  | "noalias"
+  | "nocapture"
+  | "nofree"
+  | "nest"
+  | "returned"
+  | "nonnull"
+  | "dereferenceable" ~ "(" ~ uint ~ ")"
+  | "dereferenceable_or_null" ~ "(" ~ uint ~ ")"
+  | "swiftself"
+  | "swiftasync"
+  | "swifterror"
+  | "immarg"
+  | "noundef" // | "nofpclass(<test mask>)" // TODO
+
+  | "alignstack" ~ "(" ~ uint ~ ")"
+  | "allocalign"
+  | "allocptr"
+  | "readnone"
+  | "readonly"
+  | "writeonly"
+  | "writable"
+  | "dead_on_unwind"
+}
+
+argument  = { ty ~ param_attr* ~ uid }
+arguments = { (argument ~ ("," ~ argument)*)? }
+
+addr_attr = { "unnamed_addr" | "local_unnamed_addr" }
+
+func_attr = {
+    "alignstack" ~ "(" ~ uint ~ ")" // | "alloc-family"="FAMILY" // TODO
+
+  | "allockind" ~ "(" ~ string ~ ")"
+  | "allocsize" ~ "(" ~ uint ~ ("," ~ uint) ~ ")"
+  | "alwaysinline"
+  | "builtin"
+  | "cold"
+  | "convergent"
+  | "disable_sanitizer_instrumentation"
+  | "\"dontcall-error\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"dontcall-warn\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "fn_ret_thunk_extern"
+  | ("\"frame-pointer\"" ~ "=" ~ string)
+  | "hot"
+  | "inlinehint"
+  | "jumptable" // | "memory(...)" // TODO
+
+  | "minsize"
+  | "naked"
+  | "\"no-inline-line-tables\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "no-jump-tables" // FIXME: check if this is truly w/o '"'s (missing in the docs)
+
+  | "nobuiltin"
+  | "nocallback"
+  | "noduplicate"
+  | "nofree"
+  | "noimplicitfloat"
+  | "noinline"
+  | "nomerge"
+  | "nonlazybind"
+  | "noprofile"
+  | "skipprofile"
+  | "noredzone"
+  | "indirect-tls-seg-refs" // FIXME: check if this is truly w/o '"'s (missing in the docs)
+
+  | "noreturn"
+  | "norecurse"
+  | "willreturn"
+  | "nosync"
+  | "nounwind"
+  | "nosanitize_bounds"
+  | "nosanitize_coverage"
+  | "null_pointer_is_valid"
+  | "optdebug"
+  | "optforfuzzing"
+  | "optnone"
+  | "optsize"
+  | "\"patchable-function\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"probe-stack\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"stack-probe-size\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"no-stack-arg-probe\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "returns_twice"
+  | "safestack"
+  | "sanitize_address"
+  | "sanitize_memory"
+  | "sanitize_thread"
+  | "sanitize_hwaddress"
+  | "sanitize_memtag"
+  | "speculative_load_hardening"
+  | "speculatable"
+  | "ssp"
+  | "sspstrong"
+  | "sspreq"
+  | "strictfp"
+  | "\"denormal-fp-math\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"denormal-fp-math-f32\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"thunk\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "\"tls-load-hoist\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | "uwtable" ~ ("sync" | "async")?
+  | "nocf_check"
+  | "shadowcallstack"
+  | "mustprogress" // | "warn-stack-size"="<threshold>" // TODO
+
+  | "vscale_range" ~ "(" ~ uint ~ ("," ~ uint) ~ ")"
+  | "\"nooutline\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+
+  | ("\"min-legal-vector-width\"" ~ "=" ~ string) // FIXME: find docs for this
+
+  | ("\"no-trapping-math\"" ~ "=" ~ string) // FIXME: find docs for this
+
+  | ("\"stack-protector-buffer-size\"" ~ "=" ~ string) // FIXME: find docs for this
+
+  | ("\"target-cpu\"" ~ "=" ~ string) // FIXME: find docs for this
+
+  | ("\"target-features\"" ~ "=" ~ string) // FIXME: find docs for this
+
+  | ("\"tune-cpu\"" ~ "=" ~ string) // FIXME: find docs for this
+}
+
+attr_group = @{ "#" ~ uint }
+
+bop = {
+    (("add" | "sub" | "mul" | "shl") ~ "nuw"? ~ "nsw"?)
+  | (("udiv" | "sdiv" | "lshr" | "ashr") ~ "exact"?)
+  | ("or" ~ "disjoint"?)
+  | ("urem" | "srem" | "and" | "xor")
+}
+
+val   = { int | uid | gid }
+align = { "," ~ "align" ~ uint }
+
+stmt_bop    = { bop ~ ty ~ val ~ "," ~ val }
+stmt_alloca = {
+    "alloca" ~ "inalloca"? ~ ty ~ ("," ~ ty ~ val)? ~ align? ~ ("," ~ "addrspace" ~ "(" ~ uint ~ ")")?
+}
+stmt_store  = {
+    ("store" ~ "volatile"? ~ ty ~ val ~ "," ~ ty ~ val ~ align) // TODO: !nontemporal, !invariant.group
+}
+stmt_rhs    = {
+    stmt_bop
+  | stmt_alloca
+  | stmt_store
+}
+
+stmt = {
+    (uid ~ "=")? ~ stmt_rhs
+}
+
+term = {
+    ("ret" ~ ty ~ val?)
+  | "unreachable"
+}
+
+block = {
+    (id ~ ":")? ~ stmt* ~ term
+}
+
+function = {
+    "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
+}
+
+metadata_string = @{ "!" ~ string }
+metadata_val    =  { metadata_string | metadata_name | (ty ~ int) }
+metadata_node   =  {
+    "distinct"? ~ "!{" ~ (metadata_val ~ ("," ~ metadata_val)*)? ~ "}"
+}
+metadata_prim   =  { metadata_node | metadata_string }
+metadata_name   = @{ "!" ~ id }
+metadata        =  { metadata_name ~ "=" ~ metadata_node }
+
+source_filename   = { "source_filename" ~ "=" ~ string }
+target_datalayout = { "target" ~ "datalayout" ~ "=" ~ string }
+target_triple     = { "target" ~ "triple" ~ "=" ~ string }
+attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ func_attr* ~ "}" }
+
+definition = {
+    function
+  | source_filename
+  | target_datalayout
+  | target_triple
+  | attributes
+  | metadata
+}
