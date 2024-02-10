@@ -229,31 +229,42 @@ pub struct Block {
     term: Term,
 }
 
+pub struct Function {
+    linkage: Option<Linkage>,
+    preemp: Option<Preemp>,
+    vis: Option<Visibility>,
+    store: Option<DLLStorageClass>,
+    cconv: Option<CConv>,
+    ret_attrs: Vec<ParamAttr>,
+    ret: Type,
+    name: Gid,
+    args: Vec<(Type, Vec<ParamAttr>, Uid)>,
+    addr_attr: Option<AddrAttr>,
+    //addr_space: Option<AddrSpace>, // TODO
+    func_attrs: Vec<FuncAttr>,
+    //section: Option<String>,
+    //partition: Option<String>,
+    //[comdat [($name)]]
+    //[align N]
+    //[gc]
+    //[prefix Constant]
+    //[prologue Constant]
+    //[personality Constant]
+    //(!name !N)*
+    blocks: Vec<(String, Block)>,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Function {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut iterator = pair.into_inner();
+        todo!()
+    }
+}
+
 pub enum Definition {
-    Function {
-        linkage: Option<Linkage>,
-        preemp: Option<Preemp>,
-        vis: Option<Visibility>,
-        store: Option<DLLStorageClass>,
-        cconv: Option<CConv>,
-        ret_attrs: Vec<ParamAttr>,
-        ret: Type,
-        name: Gid,
-        args: Vec<(Type, Vec<ParamAttr>, Uid)>,
-        addr_attr: Option<AddrAttr>,
-        //addr_space: Option<AddrSpace>, // TODO
-        func_attrs: Vec<FuncAttr>,
-        //section: Option<String>,
-        //partition: Option<String>,
-        //[comdat [($name)]]
-        //[align N]
-        //[gc]
-        //[prefix Constant]
-        //[prologue Constant]
-        //[personality Constant]
-        //(!name !N)*
-        blocks: Vec<(String, Block)>,
-    },
+    Function(Function),
     SourceFilename(String),
     TargetDatalayout(String),
     TargetTriple(String),
@@ -266,13 +277,14 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
         let mut iterator = pair.into_inner();
-        match iterator.next().unwrap().as_rule() {
-            Rule::function => {}
-            Rule::source_filename => {}
-            Rule::target_datalayout => {}
-            Rule::target_triple => {}
-            Rule::attributes => {}
-            Rule::metadata => {}
+        let item = iterator.next().unwrap();
+        match item.as_rule() {
+            Rule::function => Ok(Definition::Function(iterator.next().unwrap().try_into()?)),
+            Rule::source_filename => todo!(),
+            Rule::target_datalayout => todo!(),
+            Rule::target_triple => todo!(),
+            Rule::attributes => todo!(),
+            Rule::metadata => todo!(),
             _ => unreachable!(),
         }
     }
