@@ -1,6 +1,10 @@
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
+pub use pest::error::LineColLocation;
+pub use pest::Parser as PestParser;
+pub type Error = pest::error::Error<Rule>;
+
 #[derive(Parser)]
 #[grammar = "llvm.pest"]
 pub struct LLVMParser;
@@ -21,6 +25,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Module {
     }
 }
 
+#[derive(Debug)]
 pub enum Linkage {
     Private,
     Internal,
@@ -35,33 +40,48 @@ pub enum Linkage {
     External,
 }
 
+#[derive(Debug)]
 pub enum Preemp {}
+#[derive(Debug)]
 pub enum Visibility {}
+#[derive(Debug)]
 pub enum DLLStorageClass {}
+#[derive(Debug)]
 pub enum CConv {}
+#[derive(Debug)]
 pub enum Type {
     I1,
     Ptr(Box<Type>),
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Uid(String);
 
-impl<'i> TryFrom<Pair<'i, Rule>> for Uid {
+impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Uid {
     type Error = pest::error::Error<Rule>;
 
-    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut iterator = pair.into_inner();
-        match iterator.next().unwrap().as_rule() {
-            Rule::gid => {
-                unreachable!();
-            }
+    fn try_from(mut iterator: pest::iterators::Pairs<'i, Rule>) -> Result<Self, Self::Error> {
+        let pair = iterator.next().unwrap();
+        match pair.as_rule() {
+            Rule::uid => Ok(Uid(String::from(&pair.as_str()[1..]))),
             _ => unreachable!(),
         }
     }
 }
 
+#[test]
+fn test_parse_uid() {
+    use pest::Parser;
+    assert_eq!(
+        Uid::try_from(LLVMParser::parse(Rule::uid, "%0").unwrap()).unwrap(),
+        Uid(String::from("0"))
+    );
+}
+
+#[derive(Debug)]
 pub struct Gid(String);
 
+#[derive(Debug)]
 pub enum ParamAttr {
     Zeroext,
     Signext,
@@ -96,6 +116,7 @@ pub enum ParamAttr {
     DeadOnUnwind,
 }
 
+#[derive(Debug)]
 pub enum FuncAttr {
     Alignstack(usize),
     Allockind(String),
@@ -171,17 +192,20 @@ pub enum FuncAttr {
     Nooutline,
 }
 
+#[derive(Debug)]
 pub enum AddrAttr {
     UnnamedAddr,
     LocalUnnamedAddr,
 }
 
+#[derive(Debug)]
 pub enum Val {
     Int(i128),
     Uid(Uid),
     Gid(Gid),
 }
 
+#[derive(Debug)]
 pub enum Bop1 {
     Urem,
     Srem,
@@ -189,6 +213,7 @@ pub enum Bop1 {
     Xor,
 }
 
+#[derive(Debug)]
 pub enum Bop2 {
     Udiv,
     Sdiv,
@@ -196,6 +221,7 @@ pub enum Bop2 {
     Ashr,
 }
 
+#[derive(Debug)]
 pub enum Bop3 {
     Add,
     Sub,
@@ -203,12 +229,14 @@ pub enum Bop3 {
     Shl,
 }
 
+#[derive(Debug)]
 pub enum Binop {
     Bop1(Bop1),
     Bop2(Bop2, bool),
     Bop3(Bop3, bool, bool),
 }
 
+#[derive(Debug)]
 pub enum Stmt {
     Binop {
         bop: Binop,
@@ -218,17 +246,26 @@ pub enum Stmt {
     },
 }
 
+#[derive(Debug)]
 pub enum Term {
     Br(Uid),
     Cbr(Uid, Uid, Uid),
     Unreachable,
 }
 
+#[derive(Debug)]
 pub struct Block {
     insns: Vec<Stmt>,
     term: Term,
 }
 
+#[derive(Debug)]
+pub enum AddrSpace {
+    Int(usize),
+    String(String),
+}
+
+#[derive(Debug)]
 pub struct Function {
     linkage: Option<Linkage>,
     preemp: Option<Preemp>,
@@ -240,7 +277,7 @@ pub struct Function {
     name: Gid,
     args: Vec<(Type, Vec<ParamAttr>, Uid)>,
     addr_attr: Option<AddrAttr>,
-    //addr_space: Option<AddrSpace>, // TODO
+    addr_space: Option<AddrSpace>,
     func_attrs: Vec<FuncAttr>,
     //section: Option<String>,
     //partition: Option<String>,

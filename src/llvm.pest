@@ -196,6 +196,8 @@ func_attr = {
 
 attr_group = @{ "#" ~ uint }
 
+addr_space = { "addrspace" ~ "(" ~ (uint | string) ~ ")" }
+
 bop = {
     (("add" | "sub" | "mul" | "shl") ~ "nuw"? ~ "nsw"?)
   | (("udiv" | "sdiv" | "lshr" | "ashr") ~ "exact"?)
@@ -208,7 +210,7 @@ align = { "," ~ "align" ~ uint }
 
 stmt_bop    = { bop ~ ty ~ val ~ "," ~ val }
 stmt_alloca = {
-    "alloca" ~ "inalloca"? ~ ty ~ ("," ~ ty ~ val)? ~ align? ~ ("," ~ "addrspace" ~ "(" ~ uint ~ ")")?
+    "alloca" ~ "inalloca"? ~ ty ~ ("," ~ ty ~ val)? ~ align? ~ ("," ~ addr_space)?
 }
 stmt_store  = {
     ("store" ~ "volatile"? ~ ty ~ val ~ "," ~ ty ~ val ~ align) // TODO: !nontemporal, !invariant.group
@@ -233,7 +235,7 @@ block = {
 }
 
 function = {
-    "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
+    "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
 }
 
 metadata_string = @{ "!" ~ string }

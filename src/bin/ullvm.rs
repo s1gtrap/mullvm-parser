@@ -21,7 +21,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         use pest::Parser;
         let code = std::io::read_to_string(&mut input)?;
-        mullvm_parser::LLVMParser::parse(mullvm_parser::Rule::module, &code)?;
+        println!(
+            "{:?}",
+            mullvm_parser::LLVMParser::parse(mullvm_parser::Rule::module, &code)?
+        );
     }
 
     Ok(())
