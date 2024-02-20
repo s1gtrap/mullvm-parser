@@ -48,10 +48,42 @@ pub enum Visibility {}
 pub enum DLLStorageClass {}
 #[derive(Debug)]
 pub enum CConv {}
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Type {
-    I1,
+    Id(String),
     Ptr(Box<Type>),
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Type {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let ty = Type::Id(inner.next().unwrap().as_str().to_owned());
+        let ty = inner.fold(ty, |ty, _| Type::Ptr(Box::new(ty)));
+        Ok(ty)
+    }
+}
+
+#[test]
+fn test_parse_type() {
+    use pest::Parser;
+    assert_eq!(
+        Type::try_from(LLVMParser::parse(Rule::ty, "a").unwrap().next().unwrap()).unwrap(),
+        Type::Id("a".to_owned()),
+    );
+    assert_eq!(
+        Type::try_from(LLVMParser::parse(Rule::ty, "void").unwrap().next().unwrap()).unwrap(),
+        Type::Id("void".to_owned()),
+    );
+    assert_eq!(
+        Type::try_from(LLVMParser::parse(Rule::ty, "i32*").unwrap().next().unwrap()).unwrap(),
+        Type::Ptr(Box::new(Type::Id("i32".to_owned()))),
+    );
+    assert_eq!(
+        Type::try_from(LLVMParser::parse(Rule::ty, "i8**").unwrap().next().unwrap()).unwrap(),
+        Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned()))))),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -78,7 +110,7 @@ fn test_parse_uid() {
     );
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Gid(String);
 
 #[derive(Debug)]
@@ -198,14 +230,27 @@ pub enum AddrAttr {
     LocalUnnamedAddr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Val {
     Int(i128),
     Uid(Uid),
     Gid(Gid),
 }
 
-#[derive(Debug)]
+impl<'i> TryFrom<Pair<'i, Rule>> for Val {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        match pair.as_rule() {
+            Rule::int => {
+                panic!("{:?}", pair.as_str());
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Bop1 {
     Urem,
     Srem,
@@ -213,7 +258,7 @@ pub enum Bop1 {
     Xor,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Bop2 {
     Udiv,
     Sdiv,
@@ -221,7 +266,7 @@ pub enum Bop2 {
     Ashr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Bop3 {
     Add,
     Sub,
@@ -229,14 +274,14 @@ pub enum Bop3 {
     Shl,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Binop {
     Bop1(Bop1),
     Bop2(Bop2, bool),
     Bop3(Bop3, bool, bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Stmt {
     Binop {
         bop: Binop,
@@ -246,17 +291,89 @@ pub enum Stmt {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Term {
     Br(Uid),
     Cbr(Uid, Uid, Uid),
+    Ret(Type, Option<Val>),
     Unreachable,
 }
 
-#[derive(Debug)]
+impl<'i> TryFrom<Pair<'i, Rule>> for Term {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let pair = inner.next().unwrap();
+        match pair.as_rule() {
+            Rule::term_ret => {
+                let mut inner = pair.into_inner();
+                let ty = Type::try_from(inner.next().unwrap()).unwrap();
+                let val = inner.next().map(|pair| Val::try_from(pair).unwrap());
+                Ok(Term::Ret(ty, val))
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Block {
+    label: Option<String>,
     insns: Vec<Stmt>,
     term: Term,
+}
+
+impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Block {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(mut iterator: pest::iterators::Pairs<'i, Rule>) -> Result<Self, Self::Error> {
+        let pair = iterator.next().unwrap();
+        match pair.as_rule() {
+            Rule::block => {
+                let mut inner = pair.into_inner();
+                let pair = inner.next().unwrap();
+                match pair.as_rule() {
+                    Rule::block_head => {
+                        let label = pair
+                            .into_inner()
+                            .next()
+                            .map(|pair| pair.into_inner().next().unwrap().as_str().to_owned());
+                        let body = inner.next().unwrap();
+                        let term = inner.next().unwrap();
+                        Ok(Block {
+                            label,
+                            insns: body.into_inner().map(|p| panic!("{:?}", p)).collect(),
+                            term: term.try_into().unwrap(),
+                        })
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[test]
+fn test_parse_block() {
+    use pest::Parser;
+    assert_eq!(
+        Block::try_from(LLVMParser::parse(Rule::block, "  ret void").unwrap()).unwrap(),
+        Block {
+            label: None,
+            insns: vec![],
+            term: Term::Ret(Type::Id("void".to_owned()), None),
+        }
+    );
+    assert_eq!(
+        Block::try_from(LLVMParser::parse(Rule::block, "0:\n  ret void").unwrap()).unwrap(),
+        Block {
+            label: Some(String::from("0")),
+            insns: vec![],
+            term: Term::Ret(Type::Id("void".to_owned()), None),
+        }
+    );
 }
 
 #[derive(Debug)]

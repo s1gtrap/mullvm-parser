@@ -51,7 +51,8 @@ cconv = {
   | "cfguard_checkcc" // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64.
 }
 
-ty = { ("i1" | "i8" | "i16" | "i32" | "i64" | "void") ~ "*"* | "ptr" }
+star = { "*" }
+ty   = { id ~ star* }
 
 param_attr = {
     "zeroext"
@@ -225,14 +226,19 @@ stmt = {
     (uid ~ "=")? ~ stmt_rhs
 }
 
-term = {
-    ("ret" ~ ty ~ val?)
-  | "unreachable"
+term_ret         = { "ret" ~ ty ~ val? }
+term_unreachable = { "unreachable" }
+term             = { term_ret | term_unreachable }
+
+label = {
+    id ~ ":"
 }
 
-block = {
-    (id ~ ":")? ~ stmt* ~ term
+block      = {
+    block_head ~ block_body ~ term
 }
+block_head = { label? }
+block_body = { stmt* }
 
 function = {
     "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
