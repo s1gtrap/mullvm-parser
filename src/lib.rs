@@ -25,7 +25,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Module {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Linkage {
     Private,
     Internal,
@@ -40,13 +40,35 @@ pub enum Linkage {
     External,
 }
 
-#[derive(Debug)]
+impl<'i> TryFrom<Pair<'i, Rule>> for Linkage {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut iterator = pair.into_inner();
+        match iterator.next().unwrap().as_str() {
+            "private" => Ok(Linkage::Private),
+            "internal" => Ok(Linkage::Internal),
+            "available_externally" => Ok(Linkage::AvailableExternally),
+            "linkonce" => Ok(Linkage::Linkonce),
+            "weak" => Ok(Linkage::Weak),
+            "common" => Ok(Linkage::Common),
+            "appending" => Ok(Linkage::Appending),
+            "extern_weak" => Ok(Linkage::ExternWeak),
+            "linkonce_odr" => Ok(Linkage::LinkonceOdr),
+            "weak_odr" => Ok(Linkage::WeakOdr),
+            "external" => Ok(Linkage::External),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Preemp {}
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Visibility {}
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DLLStorageClass {}
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CConv {}
 #[derive(Debug, PartialEq)]
 pub enum Type {
@@ -89,11 +111,10 @@ fn test_parse_type() {
 #[derive(Debug, PartialEq)]
 pub struct Uid(String);
 
-impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Uid {
+impl<'i> TryFrom<Pair<'i, Rule>> for Uid {
     type Error = pest::error::Error<Rule>;
 
-    fn try_from(mut iterator: pest::iterators::Pairs<'i, Rule>) -> Result<Self, Self::Error> {
-        let pair = iterator.next().unwrap();
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
         match pair.as_rule() {
             Rule::uid => Ok(Uid(String::from(&pair.as_str()[1..]))),
             _ => unreachable!(),
@@ -105,7 +126,7 @@ impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Uid {
 fn test_parse_uid() {
     use pest::Parser;
     assert_eq!(
-        Uid::try_from(LLVMParser::parse(Rule::uid, "%0").unwrap()).unwrap(),
+        Uid::try_from(LLVMParser::parse(Rule::uid, "%0").unwrap().next().unwrap()).unwrap(),
         Uid(String::from("0"))
     );
 }
@@ -113,7 +134,18 @@ fn test_parse_uid() {
 #[derive(Debug, PartialEq)]
 pub struct Gid(String);
 
-#[derive(Debug)]
+impl<'i> TryFrom<Pair<'i, Rule>> for Gid {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        match pair.as_rule() {
+            Rule::gid => Ok(Gid(String::from(&pair.as_str()[1..]))),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ParamAttr {
     Zeroext,
     Signext,
@@ -148,7 +180,7 @@ pub enum ParamAttr {
     DeadOnUnwind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FuncAttr {
     Alignstack(usize),
     Allockind(String),
@@ -224,7 +256,7 @@ pub enum FuncAttr {
     Nooutline,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AddrAttr {
     UnnamedAddr,
     LocalUnnamedAddr,
@@ -242,10 +274,15 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
         match pair.as_rule() {
-            Rule::int => {
-                panic!("{:?}", pair.as_str());
+            Rule::val => {
+                let mut inner = pair.into_inner();
+                let pair = inner.next().unwrap();
+                match pair.as_rule() {
+                    Rule::int => Ok(Val::Int(pair.as_str().parse().unwrap())),
+                    p => unreachable!("{:?}", p),
+                }
             }
-            _ => unreachable!(),
+            p => unreachable!("{:?}", p),
         }
     }
 }
@@ -324,11 +361,11 @@ pub struct Block {
     term: Term,
 }
 
-impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Block {
+impl<'i> TryFrom<Pair<'i, Rule>> for Block {
     type Error = pest::error::Error<Rule>;
 
-    fn try_from(mut iterator: pest::iterators::Pairs<'i, Rule>) -> Result<Self, Self::Error> {
-        let pair = iterator.next().unwrap();
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.clone().into_inner();
         match pair.as_rule() {
             Rule::block => {
                 let mut inner = pair.into_inner();
@@ -350,7 +387,7 @@ impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Block {
                     _ => unreachable!(),
                 }
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", pair),
         }
     }
 }
@@ -359,7 +396,13 @@ impl<'i> TryFrom<pest::iterators::Pairs<'i, Rule>> for Block {
 fn test_parse_block() {
     use pest::Parser;
     assert_eq!(
-        Block::try_from(LLVMParser::parse(Rule::block, "  ret void").unwrap()).unwrap(),
+        Block::try_from(
+            LLVMParser::parse(Rule::block, "  ret void")
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .unwrap(),
         Block {
             label: None,
             insns: vec![],
@@ -367,7 +410,13 @@ fn test_parse_block() {
         }
     );
     assert_eq!(
-        Block::try_from(LLVMParser::parse(Rule::block, "0:\n  ret void").unwrap()).unwrap(),
+        Block::try_from(
+            LLVMParser::parse(Rule::block, "0:\n  ret void")
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .unwrap(),
         Block {
             label: Some(String::from("0")),
             insns: vec![],
@@ -376,13 +425,13 @@ fn test_parse_block() {
     );
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AddrSpace {
     Int(usize),
     String(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Function {
     linkage: Option<Linkage>,
     preemp: Option<Preemp>,
@@ -405,7 +454,7 @@ pub struct Function {
     //[prologue Constant]
     //[personality Constant]
     //(!name !N)*
-    blocks: Vec<(String, Block)>,
+    blocks: Vec<Block>,
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Function {
@@ -413,8 +462,96 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
         let mut iterator = pair.into_inner();
-        todo!()
+        let linkage = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(iterator.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let ret = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::ty => iterator.next().unwrap().try_into()?,
+            _ => unreachable!(),
+        };
+        let name = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::gid => iterator.next().unwrap().try_into()?,
+            _ => unreachable!(),
+        };
+        let args = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::arguments => {
+                let mut inner = iterator.next().unwrap().into_inner();
+                inner
+                    .map(|p| {
+                        let mut inner = p.into_inner();
+                        let ty = Type::try_from(inner.next().unwrap())?;
+                        //let params = ... // TODO: param attrs
+                        let id = Uid::try_from(inner.next().unwrap())?;
+                        Ok((ty, vec![], id))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            }
+            _ => unreachable!(),
+        }?;
+        let blocks = iterator
+            .map(Block::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Function {
+            linkage,
+            preemp: None,      // FIXME
+            vis: None,         // FIXME
+            store: None,       // FIXME
+            cconv: None,       // FIXME
+            ret_attrs: vec![], // FIXME
+            ret,
+            name,
+            args,               // FIXME
+            addr_attr: None,    // FIXME
+            addr_space: None,   // FIXME
+            func_attrs: vec![], // FIXME
+            //section: Option<String>,
+            //partition: Option<String>,
+            //[comdat [($name)]]
+            //[align N]
+            //[gc]
+            //[prefix Constant]
+            //[prologue Constant]
+            //[personality Constant]
+            //(!name !N)*
+            blocks,
+        })
     }
+}
+
+#[test]
+fn test_parse_function() {
+    use pest::Parser;
+    assert_eq!(
+        Function::try_from(
+            LLVMParser::parse(Rule::function, "define i8 @a() {\n  ret i8 0\n}")
+                .unwrap()
+                .next()
+                .unwrap()
+        )
+        .unwrap(),
+        Function {
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("i8".to_owned()),
+            name: Gid("a".to_owned()),
+            args: vec![],
+            addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            blocks: vec![Block {
+                label: None,
+                insns: vec![],
+                term: Term::Ret(Type::Id("i8".to_owned()), Some(Val::Int(0))),
+            }]
+        }
+    );
 }
 
 pub enum Definition {
