@@ -8,7 +8,7 @@ uint = @{ "0" | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
 int  = @{ uint | ("-" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
 
 id  = @{ (ASCII_ALPHANUMERIC | "_" | ".")+ }
-uid = @{ "%" ~ id }
+uid = @{ "%" ~ (string | id) }
 gid = @{ "@" ~ id }
 
 string = ${ "\"" ~ inner ~ "\"" }
@@ -51,8 +51,10 @@ cconv = {
   | "cfguard_checkcc" // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64.
 }
 
-star = { "*" }
-ty   = { id ~ star* }
+star      = { "*" }
+ty        = { (id | uid | ty_array | ty_struct) ~ star* }
+ty_array  = { "[" ~ uint ~ "x" ~ ty ~ "]" }
+ty_struct = { "{" ~ (ty ~ ("," ~ ty)*)? ~ "}" }
 
 param_attr = {
     "zeroext"
@@ -244,6 +246,10 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
 }
 
+ident_type = {
+    uid ~ "=" ~ "type" ~ ty
+}
+
 metadata_string = @{ "!" ~ string }
 metadata_val    =  { metadata_string | metadata_name | (ty ~ int) }
 metadata_node   =  {
@@ -260,6 +266,7 @@ attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ func_attr* ~ "}" }
 
 definition = {
     function
+  | ident_type
   | source_filename
   | target_datalayout
   | target_triple

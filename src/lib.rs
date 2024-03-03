@@ -73,7 +73,10 @@ pub enum CConv {}
 #[derive(Debug, PartialEq)]
 pub enum Type {
     Id(String),
+    Uid(Uid),
     Ptr(Box<Type>),
+    Array(usize, Box<Type>),
+    Struct(Vec<Type>),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Type {
@@ -81,7 +84,23 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
         let mut inner = pair.into_inner();
-        let ty = Type::Id(inner.next().unwrap().as_str().to_owned());
+        let pair = inner.next().unwrap();
+        let ty = match pair.as_rule() {
+            Rule::id => Type::Id(pair.as_str().to_owned()),
+            Rule::uid => Type::Uid(Uid::try_from(pair)?),
+            Rule::ty_array => {
+                let mut inner = pair.into_inner();
+                let elems = inner.next().unwrap().as_str().parse().unwrap();
+                let ty = Type::try_from(inner.next().unwrap())?;
+                Type::Array(elems, Box::new(ty))
+            }
+            Rule::ty_struct => {
+                let inner = pair.into_inner();
+                let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
+                Type::Struct(types)
+            }
+            _ => unreachable!(),
+        };
         let ty = inner.fold(ty, |ty, _| Type::Ptr(Box::new(ty)));
         Ok(ty)
     }
@@ -106,6 +125,54 @@ fn test_parse_type() {
         Type::try_from(LLVMParser::parse(Rule::ty, "i8**").unwrap().next().unwrap()).unwrap(),
         Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned()))))),
     );
+    assert_eq!(
+        Type::try_from(
+            LLVMParser::parse(Rule::ty, "[ 1 x float ]")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Type::Array(1, Box::new(Type::Id("float".to_owned()))),
+    );
+    assert_eq!(
+        Type::try_from(
+            LLVMParser::parse(Rule::ty, "[ 8 x %mytype* ]")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Type::Array(
+            8,
+            Box::new(Type::Ptr(Box::new(Type::Uid(Uid("mytype".to_owned()))))),
+        ),
+    );
+    assert_eq!(
+        Type::try_from(
+            LLVMParser::parse(Rule::ty, "{ i8 }")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Type::Struct(vec![Type::Id("i8".to_owned())]),
+    );
+    assert_eq!(
+        Type::try_from(
+            LLVMParser::parse(Rule::ty, "{ i32*, %mytype** }")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Type::Struct(vec![
+            Type::Ptr(Box::new(Type::Id("i32".to_owned()))),
+            Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Uid(Uid(
+                "mytype".to_owned(),
+            )))))),
+        ]),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -127,7 +194,17 @@ fn test_parse_uid() {
     use pest::Parser;
     assert_eq!(
         Uid::try_from(LLVMParser::parse(Rule::uid, "%0").unwrap().next().unwrap()).unwrap(),
-        Uid(String::from("0"))
+        Uid(String::from("0")),
+    );
+    assert_eq!(
+        Uid::try_from(
+            LLVMParser::parse(Rule::uid, "%\"core::option::Option<Stmt>\"")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Uid(String::from("\"core::option::Option<Stmt>\"")),
     );
 }
 
@@ -496,17 +573,17 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Function {
             linkage,
-            preemp: None,      // FIXME
-            vis: None,         // FIXME
-            store: None,       // FIXME
-            cconv: None,       // FIXME
-            ret_attrs: vec![], // FIXME
+            preemp: None,      // TODO: impl
+            vis: None,         // TODO: impl
+            store: None,       // TODO: impl
+            cconv: None,       // TODO: impl
+            ret_attrs: vec![], // TODO: impl
             ret,
             name,
-            args,               // FIXME
-            addr_attr: None,    // FIXME
-            addr_space: None,   // FIXME
-            func_attrs: vec![], // FIXME
+            args,               // TODO: impl
+            addr_attr: None,    // TODO: impl
+            addr_space: None,   // TODO: impl
+            func_attrs: vec![], // TODO: impl
             //section: Option<String>,
             //partition: Option<String>,
             //[comdat [($name)]]
@@ -559,8 +636,8 @@ pub enum Definition {
     SourceFilename(String),
     TargetDatalayout(String),
     TargetTriple(String),
-    Attributes,
-    Metadata,
+    Attributes, // TODO: impl
+    Metadata,   // TODO: impl
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
