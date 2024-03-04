@@ -249,7 +249,9 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
 }
 
-const_val    =  { ty ~ (const_str | const_packed | gid) }
+const_val    =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid) }
+const_zinit  =  { "zeroinitializer" }
+const_undef  =  { "undef" }
 const_str    = @{ "c" ~ string }
 const_packed =  { "<{" ~ (const_val ~ (", " ~ const_val)*) ~ "}>" }
 
