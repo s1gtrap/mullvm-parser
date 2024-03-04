@@ -9,7 +9,7 @@ int  = @{ uint | ("-" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
 
 id  = @{ (ASCII_ALPHANUMERIC | "_" | ".")+ }
 uid = @{ "%" ~ (string | id) }
-gid = @{ "@" ~ id }
+gid = @{ "@" ~ (string | id) }
 
 string = ${ "\"" ~ inner ~ "\"" }
 inner  = @{ char* }
@@ -257,11 +257,15 @@ const_packed =  { "<{" ~ (const_val ~ (", " ~ const_val)*) ~ "}>" }
 
 const_attr = { "global" | "constant" }
 
+named_meta_name = @{ "!" ~ id }
+named_meta_num  = @{ "!" ~ uint }
+named_meta      =  { named_meta_name ~ named_meta_num }
+
 ident_type  = {
     uid ~ "=" ~ "type" ~ ty
 }
 ident_const = {
-    gid ~ "=" ~ linkage? ~ addr_attr? ~ const_attr ~ const_val ~ align?
+    gid ~ "=" ~ linkage? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*
 }
 
 metadata_string = @{ "!" ~ string }

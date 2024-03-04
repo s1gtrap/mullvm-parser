@@ -228,6 +228,15 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Gid {
     }
 }
 
+#[test]
+fn test_parse_gid() {
+    use pest::Parser;
+    assert_eq!(
+        Gid::try_from(LLVMParser::parse(Rule::gid, r#"@"_ZN4core3ptr79drop_in_place$LT$$RF$pest..iterators..pair..Pair$LT$mullvm_parser..Rule$GT$$GT$17h2526c7a281ce5b4eE""#).unwrap().next().unwrap()).unwrap(),
+        Gid(r#""_ZN4core3ptr79drop_in_place$LT$$RF$pest..iterators..pair..Pair$LT$mullvm_parser..Rule$GT$$GT$17h2526c7a281ce5b4eE""#.to_owned()),
+    );
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ParamAttr {
     Zeroext,
@@ -729,6 +738,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             ),
             _ => None,
         };
+        // TODO: named meta
         Ok(Const {
             linkage,
             preemp: None,
