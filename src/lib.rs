@@ -9,6 +9,7 @@ pub type Error = pest::error::Error<Rule>;
 #[grammar = "llvm.pest"]
 pub struct LLVMParser;
 
+#[derive(Debug, PartialEq)]
 pub struct Module(Vec<Definition>);
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Module {
@@ -44,8 +45,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Linkage {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut iterator = pair.into_inner();
-        match iterator.next().unwrap().as_str() {
+        match pair.as_str() {
             "private" => Ok(Linkage::Private),
             "internal" => Ok(Linkage::Internal),
             "available_externally" => Ok(Linkage::AvailableExternally),
@@ -77,6 +77,7 @@ pub enum Type {
     Ptr(Box<Type>),
     Array(usize, Box<Type>),
     Struct(Vec<Type>),
+    Packed(Vec<Type>),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Type {
@@ -98,6 +99,11 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
                 let inner = pair.into_inner();
                 let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
                 Type::Struct(types)
+            }
+            Rule::ty_packed => {
+                let inner = pair.into_inner();
+                let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
+                Type::Packed(types)
             }
             _ => unreachable!(),
         };
@@ -339,6 +345,18 @@ pub enum AddrAttr {
     LocalUnnamedAddr,
 }
 
+impl<'i> TryFrom<Pair<'i, Rule>> for AddrAttr {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        match pair.as_str() {
+            "unnamed_addr" => Ok(AddrAttr::UnnamedAddr),
+            "local_unnamed_addr" => Ok(AddrAttr::LocalUnnamedAddr),
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Val {
     Int(i128),
@@ -442,7 +460,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Block {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut inner = pair.clone().into_inner();
         match pair.as_rule() {
             Rule::block => {
                 let mut inner = pair.into_inner();
@@ -555,7 +572,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
         };
         let args = match iterator.peek() {
             Some(pair) if pair.as_rule() == Rule::arguments => {
-                let mut inner = iterator.next().unwrap().into_inner();
+                let inner = iterator.next().unwrap().into_inner();
                 inner
                     .map(|p| {
                         let mut inner = p.into_inner();
@@ -631,11 +648,290 @@ fn test_parse_function() {
     );
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ThreadLocal {}
+#[derive(Debug, PartialEq)]
+pub enum ExternallyInitialized {}
+#[derive(Debug, PartialEq)]
+pub enum ConstAttr {
+    Global,
+    Constant,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for ConstAttr {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        match pair.as_str() {
+            "global" => Ok(ConstAttr::Global),
+            "constant" => Ok(ConstAttr::Constant),
+            f => unreachable!("{f:?}"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum InitializerConstant {}
+
+#[derive(Debug, PartialEq)]
+pub struct Const {
+    linkage: Option<Linkage>,
+    preemp: Option<Preemp>,
+    vis: Option<Visibility>,
+    store: Option<DLLStorageClass>,
+    cconv: Option<ThreadLocal>,
+    addr_attr: Option<AddrAttr>,
+    addr_space: Option<AddrSpace>,
+    externally_initialized: Option<ExternallyInitialized>,
+    const_attr: ConstAttr,
+    ty: Type,
+    name: Gid,
+    initializer_constant: Option<InitializerConstant>,
+    // section: String // TODO: impl
+    // comdat: String // TODO: impl
+    align: Option<usize>,
+    // metadata: TODO // TODO: impl
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Const {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let name: Gid = inner.next().unwrap().try_into()?;
+        let linkage = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let addr_attr = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::addr_attr => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let const_attr = ConstAttr::try_from(inner.next().unwrap())?;
+        let pair = inner.next().unwrap();
+        println!("{:?}\n", pair);
+        let ty = Type::try_from(pair.into_inner().next().unwrap())?;
+        let align = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::align => Some(
+                inner
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .expect("failed to parse alignment"),
+            ),
+            _ => None,
+        };
+        Ok(Const {
+            linkage,
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr,
+            ty,
+            name,
+            initializer_constant: None,
+            align,
+        })
+    }
+}
+
+#[test]
+#[ignore]
+fn test_parse_ident_type() {
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(Rule::ident_const, r#"%Function = type { %"alloc::vec::Vec<ParamAttr>", %Gid, %"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>", %"alloc::vec::Vec<FuncAttr>", %"alloc::vec::Vec<Block>", %Type, %"core::option::Option<AddrSpace>", i8, i8, %"core::option::Option<Preemp>::None", %"core::option::Option<Visibility>::None", %"core::option::Option<DLLStorageClass>::None", %"core::option::Option<CConv>::None", [6 x i8] }"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+            Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Array(5, Box::new(Type::Id("i8".to_owned()))),
+            name: Gid("alloc_36df4256b240971941363a0ebb177d9e".to_owned()),
+            initializer_constant: None,
+            align: None,
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+    LLVMParser::parse(Rule::ident_const, r#"%"{closure@<core::result::Result<alloc::vec::Vec<Block>, pest::error::Error<Rule>> as core::iter::traits::collect::FromIterator<core::result::Result<Block, pest::error::Error<Rule>>>>::from_iter<core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>>::{closure#0}}" = type {}"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+            Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Array(5, Box::new(Type::Id("i8".to_owned()))),
+            name: Gid("alloc_36df4256b240971941363a0ebb177d9e".to_owned()),
+            initializer_constant: None,
+            align: None,
+        },
+    );
+}
+
+#[test]
+fn test_parse_ident_const() {
+    use pest::Parser;
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(Rule::ident_const, r#"@.str = global [5 x i8] c"Hello""#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Array(5, Box::new(Type::Id("i8".to_owned()))),
+            name: Gid(".str".to_owned()),
+            initializer_constant: None,
+            align: None,
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(Rule::ident_const, r#"@.str = global [4 x i8] c"%d\0A\00""#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Array(4, Box::new(Type::Id("i8".to_owned()))),
+            name: Gid(".str".to_owned()),
+            initializer_constant: None,
+            align: None,
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(Rule::ident_const, r#"@0 = private unnamed_addr constant <{ [16 x i8] }> <{ [16 x i8] c"\01\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Packed(vec![Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
+            name: Gid("0".to_owned()),
+            initializer_constant: None,
+            align: Some(8),
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(Rule::ident_const, r#"@alloc_36df4256b240971941363a0ebb177d9e = private unnamed_addr constant <{ ptr, [16 x i8] }> <{ ptr @alloc_94bbb66cf5550f46247d07c4155841ce, [16 x i8] c"K\00\00\00\00\00\00\00M\01\00\00\0D\00\00\00" }>, align 8"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Packed(vec![Type::Id("ptr".to_owned()), Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
+            name: Gid("alloc_36df4256b240971941363a0ebb177d9e".to_owned()),
+            initializer_constant: None,
+            align: Some(8),
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(Rule::ident_const,    r#"@alloc_b58bc021c3e44cc3d3a416ce343bcc6c = private unnamed_addr constant <{ ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8] }> <{ ptr @alloc_cc04218366297a9feed8b11aca7e8ec4, [8 x i8] c"\07\00\00\00\00\00\00\00", ptr @alloc_574d1a2219ebd7ae8db35e273d007636, [8 x i8] c"\08\00\00\00\00\00\00\00", ptr @alloc_081ab6102820eb6dbf606bc2a42bf682, [8 x i8] c"\08\00\00\00\00\00\00\00", ptr @alloc_1713fdbdd59e3f6dd78509f861b8bb36, [8 x i8] c"\04\00\00\00\00\00\00\00", ptr @alloc_228b951a53cd2b066a5833c8dc256a67, [8 x i8] c"\04\00\00\00\00\00\00\00", ptr @alloc_04111f00952c5e02df867bfba0bcedd9, [8 x i8] c"\0E\00\00\00\00\00\00\00" }>, align 8"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Packed(vec![Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned())))]),
+            name: Gid("alloc_b58bc021c3e44cc3d3a416ce343bcc6c".to_owned()),
+            initializer_constant: None,
+            align: Some(8),
+        },
+    );
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Definition {
     Function(Function),
     SourceFilename(String),
     TargetDatalayout(String),
     TargetTriple(String),
+    Const(Const),
     Attributes, // TODO: impl
     Metadata,   // TODO: impl
 }
@@ -648,6 +944,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
         let item = iterator.next().unwrap();
         match item.as_rule() {
             Rule::function => Ok(Definition::Function(iterator.next().unwrap().try_into()?)),
+            Rule::ident_type => todo!(),
+            Rule::ident_const => Ok(Definition::Const(iterator.next().unwrap().try_into()?)),
             Rule::source_filename => todo!(),
             Rule::target_datalayout => todo!(),
             Rule::target_triple => todo!(),
