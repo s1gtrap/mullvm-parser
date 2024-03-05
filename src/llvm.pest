@@ -15,6 +15,7 @@ string = ${ "\"" ~ inner ~ "\"" }
 inner  = @{ char* }
 char   =  {
     !("\"" | "\\") ~ ANY
+  | "\\\\"
   | "\\" ~ ('0'..'9' | 'A'..'F'){2}
 }
 
@@ -246,7 +247,7 @@ block_head = { label? }
 block_body = { stmt* }
 
 function = {
-    "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ "{" ~ block+ ~ "}"
+    "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
 const_val    =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid) }
@@ -261,11 +262,25 @@ named_meta_name = @{ "!" ~ id }
 named_meta_num  = @{ "!" ~ uint }
 named_meta      =  { named_meta_name ~ named_meta_num }
 
+linkage_int = {
+    "private"
+  | "internal"
+  | "available_externally"
+  | "linkonce"
+  | "weak"
+  | "common"
+  | "appending"
+  | "extern_weak"
+  | "linkonce_odr"
+  | "weak_odr"
+}
+linkage_ext = { "external" }
+
 ident_type  = {
     uid ~ "=" ~ "type" ~ ty
 }
 ident_const = {
-    gid ~ "=" ~ linkage? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*
+    gid ~ "=" ~ ((linkage_int? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*) | linkage_ext ~ addr_attr? ~ const_attr ~ ty ~ align? ~ ("," ~ named_meta)*)
 }
 
 metadata_string = @{ "!" ~ string }
