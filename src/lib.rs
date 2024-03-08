@@ -709,7 +709,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
         let mut inner = pair.into_inner();
         let name: Gid = inner.next().unwrap().try_into()?;
         let linkage = match inner.peek() {
-            Some(pair) if pair.as_rule() == Rule::linkage => {
+            Some(pair)
+                if pair.as_rule() == Rule::linkage_int || pair.as_rule() == Rule::linkage_ext =>
+            {
                 Some(inner.next().unwrap().try_into()?)
             }
             _ => None,

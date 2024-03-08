@@ -280,7 +280,7 @@ ident_type  = {
     uid ~ "=" ~ "type" ~ ty
 }
 ident_const = {
-    gid ~ "=" ~ ((linkage_int? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*) | linkage_ext ~ addr_attr? ~ const_attr ~ ty ~ align? ~ ("," ~ named_meta)*)
+    gid ~ "=" ~ ((linkage_int? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*) | (linkage_ext ~ addr_attr? ~ const_attr ~ ty ~ align? ~ ("," ~ named_meta)*))
 }
 
 metadata_string = @{ "!" ~ string }
