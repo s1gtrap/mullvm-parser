@@ -383,6 +383,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                 let pair = inner.next().unwrap();
                 match pair.as_rule() {
                     Rule::int => Ok(Val::Int(pair.as_str().parse().unwrap())),
+                    Rule::uid => Ok(Val::Uid(pair.try_into()?)),
                     p => unreachable!("{:?}", p),
                 }
             }
@@ -423,13 +424,227 @@ pub enum Binop {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Stmt {
+pub struct Alloca {
+    inalloca: bool,
+    ty: Type,
+    n: Option<(Type, Val)>,
+    align: Option<usize>,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Alloca {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let inalloca = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::inalloca => {
+                inner.next().unwrap();
+                true
+            }
+            _ => false,
+        };
+        let ty = Type::try_from(inner.next().unwrap())?;
+        let n = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::ty => Some((
+                inner.next().unwrap().try_into()?,
+                inner.next().unwrap().try_into()?,
+            )),
+            _ => None,
+        };
+        let align = inner.next().map(|pair| {
+            pair.into_inner()
+                .next()
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("failed to parse align (uint)")
+        });
+        Ok(Alloca {
+            inalloca,
+            ty,
+            n,
+            align,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Store {
+    volatile: bool,
+    ty: Type,
+    val: Val,
+    pty: Type,
+    pval: Val,
+    align: Option<usize>,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Store {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let volatile = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::volatile => {
+                inner.next().unwrap();
+                true
+            }
+            _ => false,
+        };
+        let ty = Type::try_from(inner.next().unwrap())?;
+        let val = Val::try_from(inner.next().unwrap())?;
+        let pty = Type::try_from(inner.next().unwrap())?;
+        let pval = Val::try_from(inner.next().unwrap())?;
+        let align = inner.next().map(|pair| {
+            pair.into_inner()
+                .next()
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("failed to parse align (uint)")
+        });
+        Ok(Store {
+            volatile,
+            ty,
+            val,
+            pty,
+            pval,
+            align,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum StmtRhs {
     Binop {
         bop: Binop,
         ty: Type,
         op1: Val,
         op2: Val,
     },
+    Alloca(Alloca),
+    Store(Store),
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let pair = inner.next().unwrap();
+        match pair.as_rule() {
+            Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
+            Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
+            p => unreachable!("{:?}", p),
+        }
+    }
+}
+
+#[test]
+fn test_parse_stmt_rhs() {
+    use pest::Parser;
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(Rule::stmt_rhs, r#"alloca %"Stmt::Binop", align 16"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Alloca(Alloca {
+            inalloca: false,
+            ty: Type::Uid(Uid(r#""Stmt::Binop""#.to_owned())),
+            n: None,
+            align: Some(16),
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "store ptr %self, ptr %self.dbg.spill, align 8", // FIXME: whitespace breaks this
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Store(Store {
+            volatile: false,
+            ty: Type::Id("ptr".to_owned()),
+            val: Val::Uid(Uid("self".to_owned())),
+            pty: Type::Id("ptr".to_owned()),
+            pval: Val::Uid(Uid("self.dbg.spill".to_owned())),
+            align: Some(8),
+        }),
+    );
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Stmt(Option<Uid>, StmtRhs);
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Stmt {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let lhs = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::uid => Some(inner.next().unwrap().try_into()?),
+            _ => None,
+        };
+        let rhs = inner.next().unwrap().try_into()?;
+        Ok(Stmt(lhs, rhs))
+    }
+}
+
+#[test]
+fn test_parse_stmt() {
+    use pest::Parser;
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                r#"%_8 = alloca { %"pest::iterators::pair::Pair<'_, Rule>" }, align 8"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("_8".to_owned())),
+            StmtRhs::Alloca(Alloca {
+                inalloca: false,
+                ty: Type::Struct(vec![Type::Uid(Uid(
+                    r#""pest::iterators::pair::Pair<'_, Rule>""#.to_owned(),
+                ))]),
+                n: None,
+                align: Some(8),
+            }),
+        ),
+    );
+    /*assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                r#"%_8 = alloca { %"pest::iterators::pair::Pair<'_, Rule>" }, align 8"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            None,
+            StmtRhs::Store(Store {
+                volatile: false,
+                ty: Type::Id("ptr".to_owned()),
+                val: Val::Uid(Uid("self".to_owned())),
+                pty: Type::Id("ptr".to_owned()),
+                pval: Val::Uid(Uid("self.dbg.spill".to_owned())),
+                align: Some(8),
+            }),
+        ),
+    );*/
 }
 
 #[derive(Debug, PartialEq)]

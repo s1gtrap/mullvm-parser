@@ -215,17 +215,37 @@ bop = {
 val   = { int | uid | gid }
 align = { "," ~ "align" ~ uint }
 
+tail            = { "tail" | "musttail" | "notail" }
+fast_math_flags = {
+    "nnan"
+  | "ninf"
+  | "nsz"
+  | "arcp"
+  | "contract"
+  | "afn"
+  | "reassoc"
+  | "fast"
+}
+
+inalloca = { "inalloca" }
+volatile = { "volatile" }
+
 stmt_bop    = { bop ~ ty ~ val ~ "," ~ val }
 stmt_alloca = {
-    "alloca" ~ "inalloca"? ~ ty ~ ("," ~ ty ~ val)? ~ align? ~ ("," ~ addr_space)?
+    "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)?
 }
 stmt_store  = {
-    ("store" ~ "volatile"? ~ ty ~ val ~ "," ~ ty ~ val ~ align) // TODO: !nontemporal, !invariant.group
+    // TODO: !nontemporal, !invariant.group
+    "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align?
+}
+stmt_call   = {
+    (tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "," ~ ty ~ val ~ align) // TODO: !nontemporal, !invariant.group
 }
 stmt_rhs    = {
     stmt_bop
   | stmt_alloca
   | stmt_store
+  | stmt_call
 }
 
 stmt = {
