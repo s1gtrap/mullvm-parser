@@ -384,6 +384,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                 match pair.as_rule() {
                     Rule::int => Ok(Val::Int(pair.as_str().parse().unwrap())),
                     Rule::uid => Ok(Val::Uid(pair.try_into()?)),
+                    Rule::gid => Ok(Val::Gid(pair.try_into()?)),
                     p => unreachable!("{:?}", p),
                 }
             }
@@ -514,6 +515,120 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Store {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Tail {
+    Tail,
+    Musttail,
+    Notail,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Tail {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        match pair.as_str() {
+            "tail" => Ok(Tail::Tail),
+            "musttail" => Ok(Tail::Musttail),
+            "notail" => Ok(Tail::Notail),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FastMathFlags {
+    Nnan,
+    Ninf,
+    Nsz,
+    Arcp,
+    Contract,
+    Afn,
+    Reassoc,
+    Fast,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for FastMathFlags {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        match pair.as_str() {
+            "nnan" => Ok(FastMathFlags::Nnan),
+            "ninf" => Ok(FastMathFlags::Ninf),
+            "nsz" => Ok(FastMathFlags::Nsz),
+            "arcp" => Ok(FastMathFlags::Arcp),
+            "contract" => Ok(FastMathFlags::Contract),
+            "afn" => Ok(FastMathFlags::Afn),
+            "reassoc" => Ok(FastMathFlags::Reassoc),
+            "fast" => Ok(FastMathFlags::Fast),
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Cconv {
+    Ccc,
+    Fastcc,
+    Coldcc,
+    Ghccc,
+    Cc11,
+    Anyregcc,
+    PreserveMostcc,
+    PreserveAllcc,
+    CxxFastTlscc,
+    Tailcc,
+    Swiftcc,
+    Swifttailcc,
+    CfguardCheckcc,
+    // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64. // TODO: impl
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Call {
+    tail: Option<Tail>,
+    fast_math_flags: Option<FastMathFlags>,
+    cconv: Option<Cconv>,
+    ret_attrs: Vec<ParamAttr>,
+    addrspace: Option<AddrSpace>,
+    ty: Type,
+    val: Val,
+    args: Vec<(Type, Val)>,
+    fn_attrs: Vec<FuncAttr>,
+    // [ operand bundles ] // TODO: impl
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Call {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let tail = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::tail => Some(inner.next().unwrap().try_into()?),
+            _ => None,
+        };
+        let fast_math_flags = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::fast_math_flags => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let ty = inner.next().unwrap().try_into()?;
+        let val = inner.next().unwrap().try_into()?;
+        Ok(Call {
+            tail,
+            fast_math_flags,
+            cconv: None,       // TODO: impl
+            ret_attrs: vec![], // TODO: impl
+            addrspace: None,   // TODO: impl
+            ty,
+            val,
+            args: vec![], // TODO: impl
+            fn_attrs: vec![], // TODO: impl
+                          // [ operand bundles ] // TODO: impl
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
     Binop {
         bop: Binop,
@@ -523,6 +638,7 @@ pub enum StmtRhs {
     },
     Alloca(Alloca),
     Store(Store),
+    Call(Call),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
@@ -534,6 +650,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
         match pair.as_rule() {
             Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
             Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
+            Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             p => unreachable!("{:?}", p),
         }
     }
@@ -645,6 +762,33 @@ fn test_parse_stmt() {
             }),
         ),
     );*/
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+    r#"call void @llvm.dbg.declare(metadata ptr %self.dbg.spill, metadata !801, metadata !DIExpression()), !dbg !804"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            None,
+            StmtRhs::Call(Call {
+    tail: None,
+    fast_math_flags: None,
+    cconv: None,
+    ret_attrs: vec![],
+    addrspace: None,
+    ty: Type::Id("void".to_owned()),
+    val: Val::Gid(Gid("llvm.dbg.declare".to_owned())),
+    args: vec![],
+    fn_attrs: vec![],
+    // [ operand bundles ] // TODO: impl
+            }),
+        ),
+    );
 }
 
 #[derive(Debug, PartialEq)]

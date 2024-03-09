@@ -239,7 +239,7 @@ stmt_store  = {
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align?
 }
 stmt_call   = {
-    (tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "," ~ ty ~ val ~ align) // TODO: !nontemporal, !invariant.group
+    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val
 }
 stmt_rhs    = {
     stmt_bop
