@@ -297,10 +297,10 @@ stmt = {
     (uid ~ "=")? ~ stmt_rhs
 }
 
-term_ret         = { "ret" ~ ty ~ val? }
+term_ret         = { "ret" ~ ty ~ val? ~ ("," ~ metadata_name ~ metadata_num)* }
 term_br          = { "br" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
 term_cbr         = { "br" ~ "i1" ~ val ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
-term_unreachable = { "unreachable" }
+term_unreachable = { "unreachable" ~ ("," ~ metadata_name ~ metadata_num)* }
 term             = { term_ret | term_br | term_cbr | term_unreachable }
 
 label = {
