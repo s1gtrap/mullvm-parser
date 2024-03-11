@@ -212,7 +212,8 @@ bop = {
   | ("urem" | "srem" | "and" | "xor")
 }
 
-val   = { int | uid | gid }
+bool  = { "true" | "false" }
+val   = { int | uid | gid | bool }
 align = { "," ~ "align" ~ uint }
 
 tail            = { "tail" | "musttail" | "notail" }
