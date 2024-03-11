@@ -230,6 +230,11 @@ fast_math_flags = {
 inalloca = { "inalloca" }
 volatile = { "volatile" }
 
+param          = { (param_metadata ~ metadata_val) | (param_metadata? ~ param_ty ~ param_attr* ~ val) }
+param_metadata = { "metadata" }
+param_ty       = { param_metadata? ~ ty }
+params         = { (param ~ ("," ~ param)*)? }
+
 stmt_bop    = { bop ~ ty ~ val ~ "," ~ val }
 stmt_alloca = {
     "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)?
@@ -239,7 +244,7 @@ stmt_store  = {
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align?
 }
 stmt_call   = {
-    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val
+    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ ("," ~ metadata_name ~ metadata_num)
 }
 stmt_rhs    = {
     stmt_bop
@@ -304,7 +309,10 @@ ident_const = {
 }
 
 metadata_string = @{ "!" ~ string }
-metadata_val    =  { metadata_string | metadata_name | (ty ~ int) }
+metadata_num    = @{ "!" ~ uint }
+metadata_val    =  { metadata_string | (metadata_name ~ metadata_struct?) | (ty ~ int) }
+// TODO: impl inner for struct
+metadata_struct =  { "(" ~ ")" }
 metadata_node   =  {
     "distinct"? ~ "!{" ~ (metadata_val ~ ("," ~ metadata_val)*)? ~ "}"
 }

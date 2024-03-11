@@ -766,7 +766,7 @@ fn test_parse_stmt() {
         Stmt::try_from(
             LLVMParser::parse(
                 Rule::stmt,
-    r#"call void @llvm.dbg.declare(metadata ptr %self.dbg.spill, metadata !801, metadata !DIExpression()), !dbg !804"#,
+                r#"call void @llvm.dbg.declare(metadata ptr %self.dbg.spill, metadata !801, metadata !DIExpression()), !dbg !804"#,
             )
             .unwrap()
             .next()
@@ -776,16 +776,16 @@ fn test_parse_stmt() {
         Stmt(
             None,
             StmtRhs::Call(Call {
-    tail: None,
-    fast_math_flags: None,
-    cconv: None,
-    ret_attrs: vec![],
-    addrspace: None,
-    ty: Type::Id("void".to_owned()),
-    val: Val::Gid(Gid("llvm.dbg.declare".to_owned())),
-    args: vec![],
-    fn_attrs: vec![],
-    // [ operand bundles ] // TODO: impl
+                tail: None,
+                fast_math_flags: None,
+                cconv: None,
+                ret_attrs: vec![],
+                addrspace: None,
+                ty: Type::Id("void".to_owned()),
+                val: Val::Gid(Gid("llvm.dbg.declare".to_owned())),
+                args: vec![],
+                fn_attrs: vec![],
+                // [ operand bundles ] // TODO: impl
             }),
         ),
     );
