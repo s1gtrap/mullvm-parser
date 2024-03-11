@@ -212,9 +212,11 @@ bop = {
   | ("urem" | "srem" | "and" | "xor")
 }
 
-bool  = { "true" | "false" }
-val   = { int | uid | gid | bool }
-align = { "," ~ "align" ~ uint }
+poison = { "poison" }
+undef  = { "undef" }
+bool   = { "true" | "false" }
+val    = { int | uid | gid | bool | poison | undef }
+align  = { "," ~ "align" ~ uint }
 
 tail            = { "tail" | "musttail" | "notail" }
 fast_math_flags = {
