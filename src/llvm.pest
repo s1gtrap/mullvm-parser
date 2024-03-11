@@ -236,30 +236,30 @@ param_metadata = { "metadata" }
 param_ty       = { param_metadata? ~ ty }
 params         = { (param ~ ("," ~ param)*)? }
 
-stmt_bop      = { bop ~ ty ~ val ~ "," ~ val }
-stmt_alloca   = {
+stmt_bop         = { bop ~ ty ~ val ~ "," ~ val }
+stmt_alloca      = {
     "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)?
 }
-stmt_store    = {
+stmt_store       = {
     // TODO: !nontemporal, !invariant.group
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_call     = {
+stmt_call        = {
     tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ ("," ~ metadata_name ~ metadata_num)*
 }
-inbounds      = { "inbounds" }
-inrange       = { "inrange" }
-stmt_gep_leg  = { "," ~ inrange? ~ ty ~ val }
-stmt_gep      = {
+inbounds         = { "inbounds" }
+inrange          = { "inrange" }
+stmt_gep_leg     = { "," ~ inrange? ~ ty ~ val }
+stmt_gep         = {
     "getelementptr" ~ inbounds? ~ ty ~ "," ~ ty ~ val ~ stmt_gep_leg* ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_load     = {
+stmt_load        = {
     "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_ptrtoint = {
+stmt_ptrtoint    = {
     "ptrtoint" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ metadata_name ~ metadata_num)*
 }
-cond          = {
+cond             = {
     "eq"
   | "ne"
   | "ugt"
@@ -271,17 +271,20 @@ cond          = {
   | "slt"
   | "sle"
 }
-stmt_icmp     = {
+stmt_icmp        = {
     "icmp" ~ cond ~ ty ~ val ~ "," ~ val ~ ("," ~ metadata_name ~ metadata_num)*
 }
-selty         = {
+selty            = {
     "i1"
   | ("<" ~ uint ~ "x" ~ "i1" ~ ">")
 }
-stmt_select   = {
+stmt_select      = {
     "select" ~ fast_math_flags? ~ selty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_rhs      = {
+stmt_insertvalue = {
+    "insertvalue" ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ val ~ ("," ~ val)* ~ ("," ~ metadata_name ~ metadata_num)*
+}
+stmt_rhs         = {
     stmt_bop
   | stmt_alloca
   | stmt_store
@@ -291,6 +294,7 @@ stmt_rhs      = {
   | stmt_ptrtoint
   | stmt_icmp
   | stmt_select
+  | stmt_insertvalue
 }
 
 stmt = {
@@ -301,7 +305,10 @@ term_ret         = { "ret" ~ ty ~ val? ~ ("," ~ metadata_name ~ metadata_num)* }
 term_br          = { "br" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
 term_cbr         = { "br" ~ "i1" ~ val ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
 term_unreachable = { "unreachable" ~ ("," ~ metadata_name ~ metadata_num)* }
-term             = { term_ret | term_br | term_cbr | term_unreachable }
+term_invoke      = {
+    "invoke" ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ arguments ~ ")" ~ func_attr* ~ "to" ~ "label" ~ uid ~ "unwind" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)*
+}
+term             = { term_ret | term_br | term_cbr | term_unreachable | term_invoke }
 
 label = {
     id ~ ":"
