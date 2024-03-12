@@ -297,6 +297,9 @@ stmt_landingpad   = {
 stmt_extractvalue = {
     "extractvalue" ~ ty ~ val ~ "," ~ val ~ ("," ~ val)*
 }
+stmt_trunc        = {
+    "trunc" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
 stmt_rhs          = {
     stmt_bop
   | stmt_alloca
@@ -310,6 +313,7 @@ stmt_rhs          = {
   | stmt_insertvalue
   | stmt_landingpad
   | stmt_extractvalue
+  | stmt_trunc
 }
 
 stmt = {
