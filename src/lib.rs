@@ -16,13 +16,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Module {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut iterator = pair.into_inner();
-        match iterator.next().unwrap().as_rule() {
-            Rule::gid => {
-                unreachable!();
-            }
-            _ => unreachable!(),
-        }
+        let  inner = pair.into_inner();
+        Ok(Module(
+            inner
+                .map(|p| Definition::try_from(p))
+                .collect::<Result<_, _>>()?,
+        ))
     }
 }
 
@@ -64,12 +63,16 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Linkage {
 
 #[derive(Debug, PartialEq)]
 pub enum Preemp {}
+
 #[derive(Debug, PartialEq)]
 pub enum Visibility {}
+
 #[derive(Debug, PartialEq)]
 pub enum DLLStorageClass {}
+
 #[derive(Debug, PartialEq)]
 pub enum CConv {}
+
 #[derive(Debug, PartialEq)]
 pub enum Type {
     Id(String),
@@ -84,6 +87,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        println!("{:?}", pair);
         let mut inner = pair.into_inner();
         let pair = inner.next().unwrap();
         let ty = match pair.as_rule() {
@@ -1019,6 +1023,44 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstAttr {
 pub enum InitializerConstant {}
 
 #[derive(Debug, PartialEq)]
+pub struct IdentType(String, Type);
+
+impl<'i> TryFrom<Pair<'i, Rule>> for IdentType {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let id = inner.next().unwrap().as_str()[1..].to_owned();
+        let ty = Type::try_from(inner.next().unwrap())?;
+        Ok(IdentType(id, ty))
+    }
+}
+
+#[test]
+fn test_parse_ident_type() {
+    assert_eq!(
+        IdentType::try_from(
+            LLVMParser::parse(Rule::ident_type, r#"%Function = type { %"alloc::vec::Vec<ParamAttr>", %Gid, %"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>", %"alloc::vec::Vec<FuncAttr>", %"alloc::vec::Vec<Block>", %Type, %"core::option::Option<AddrSpace>", i8, i8, %"core::option::Option<Preemp>::None", %"core::option::Option<Visibility>::None", %"core::option::Option<DLLStorageClass>::None", %"core::option::Option<CConv>::None", [6 x i8] }"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        IdentType("Function".to_owned(), Type::Struct(vec![Type::Uid(Uid("\"alloc::vec::Vec<ParamAttr>\"".to_owned())), Type::Uid(Uid("Gid".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>\"".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<FuncAttr>\"".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<Block>\"".to_owned())), Type::Uid(Uid("Type".to_owned())), Type::Uid(Uid("\"core::option::Option<AddrSpace>\"".to_owned())), Type::Id("i8".to_owned()), Type::Id("i8".to_owned()), Type::Uid(Uid("\"core::option::Option<Preemp>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<Visibility>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<DLLStorageClass>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<CConv>::None\"".to_owned())), Type::Array(6, Box::new(Type::Id("i8".to_owned())))])),
+    );
+    assert_eq!(
+        IdentType::try_from(
+            LLVMParser::parse(Rule::ident_type, r#"%"{closure@<core::result::Result<alloc::vec::Vec<Block>, pest::error::Error<Rule>> as core::iter::traits::collect::FromIterator<core::result::Result<Block, pest::error::Error<Rule>>>>::from_iter<core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>>::{closure#0}}" = type {}"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        IdentType(r#""{closure@<core::result::Result<alloc::vec::Vec<Block>, pest::error::Error<Rule>> as core::iter::traits::collect::FromIterator<core::result::Result<Block, pest::error::Error<Rule>>>>::from_iter<core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>>::{closure#0}}""#.to_owned(), Type::Struct(vec![])),
+    );
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Const {
     linkage: Option<Linkage>,
     preemp: Option<Preemp>,
@@ -1093,59 +1135,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             align,
         })
     }
-}
-
-#[test]
-#[ignore]
-fn test_parse_ident_type() {
-    assert_eq!(
-        Const::try_from(
-            LLVMParser::parse(Rule::ident_const, r#"%Function = type { %"alloc::vec::Vec<ParamAttr>", %Gid, %"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>", %"alloc::vec::Vec<FuncAttr>", %"alloc::vec::Vec<Block>", %Type, %"core::option::Option<AddrSpace>", i8, i8, %"core::option::Option<Preemp>::None", %"core::option::Option<Visibility>::None", %"core::option::Option<DLLStorageClass>::None", %"core::option::Option<CConv>::None", [6 x i8] }"#)
-                .unwrap()
-                .next()
-                .unwrap(),
-        )
-        .unwrap(),
-            Const {
-            linkage: Some(Linkage::Private),
-            preemp: None,
-            vis: None,
-            store: None,
-            cconv: None,
-            addr_attr: Some(AddrAttr::UnnamedAddr),
-            addr_space: None,
-            externally_initialized: None,
-            const_attr: ConstAttr::Constant,
-            ty: Type::Array(5, Box::new(Type::Id("i8".to_owned()))),
-            name: Gid("alloc_36df4256b240971941363a0ebb177d9e".to_owned()),
-            initializer_constant: None,
-            align: None,
-        },
-    );
-    assert_eq!(
-        Const::try_from(
-    LLVMParser::parse(Rule::ident_const, r#"%"{closure@<core::result::Result<alloc::vec::Vec<Block>, pest::error::Error<Rule>> as core::iter::traits::collect::FromIterator<core::result::Result<Block, pest::error::Error<Rule>>>>::from_iter<core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>>::{closure#0}}" = type {}"#)
-                .unwrap()
-                .next()
-                .unwrap(),
-        )
-        .unwrap(),
-            Const {
-            linkage: Some(Linkage::Private),
-            preemp: None,
-            vis: None,
-            store: None,
-            cconv: None,
-            addr_attr: Some(AddrAttr::UnnamedAddr),
-            addr_space: None,
-            externally_initialized: None,
-            const_attr: ConstAttr::Constant,
-            ty: Type::Array(5, Box::new(Type::Id("i8".to_owned()))),
-            name: Gid("alloc_36df4256b240971941363a0ebb177d9e".to_owned()),
-            initializer_constant: None,
-            align: None,
-        },
-    );
 }
 
 #[test]
@@ -1276,6 +1265,7 @@ fn test_parse_ident_const() {
 #[derive(Debug, PartialEq)]
 pub enum Definition {
     Function(Function),
+    IdentType(IdentType),
     SourceFilename(String),
     TargetDatalayout(String),
     TargetTriple(String),
@@ -1288,18 +1278,74 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut iterator = pair.into_inner();
-        let item = iterator.next().unwrap();
+        let mut inner = pair.into_inner();
+        let item = inner.next().unwrap();
         match item.as_rule() {
-            Rule::function => Ok(Definition::Function(iterator.next().unwrap().try_into()?)),
-            Rule::ident_type => todo!(),
-            Rule::ident_const => Ok(Definition::Const(iterator.next().unwrap().try_into()?)),
-            Rule::source_filename => todo!(),
-            Rule::target_datalayout => todo!(),
-            Rule::target_triple => todo!(),
+            Rule::function => Ok(Definition::Function(item.try_into()?)),
+            Rule::ident_type => Ok(Definition::IdentType(item.try_into()?)),
+            Rule::ident_const => Ok(Definition::Const(item.try_into()?)),
+            Rule::source_filename => Ok(Definition::SourceFilename(
+                item.into_inner().next().unwrap().into_inner().next().unwrap().as_str().to_owned(),
+            )),
+            Rule::target_datalayout => Ok(Definition::TargetDatalayout(
+                item.into_inner().next().unwrap().into_inner().next().unwrap().as_str().to_owned(),
+            )),
+            Rule::target_triple => Ok(Definition::TargetTriple(
+                item.into_inner().next().unwrap().into_inner().next().unwrap().as_str().to_owned(),
+            )),
             Rule::attributes => todo!(),
             Rule::metadata => todo!(),
-            _ => unreachable!(),
+            p => unreachable!("{p:?}"),
         }
     }
+}
+#[test]
+fn test_parse_definition() {
+    use pest::Parser;
+
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, r#"source_filename = "17dlqfp628g0keep""#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::SourceFilename("17dlqfp628g0keep".to_owned()),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, r#"target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128""#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::TargetDatalayout("e-m:o-i64:64-i128:128-n32:64-S128".to_owned()),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, r#"target triple = "arm64-apple-macosx11.0.0""#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::TargetTriple("arm64-apple-macosx11.0.0".to_owned()),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, r#"%"{closure@core::iter::adapters::map::map_try_fold<'_, pest::iterators::pair::Pair<'_, Rule>, core::result::Result<Block, pest::error::Error<Rule>>, (), core::ops::control_flow::ControlFlow<core::ops::control_flow::ControlFlow<Block>>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}, {closure@<core::iter::adapters::GenericShunt<'_, core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>, core::result::Result<core::convert::Infallible, pest::error::Error<Rule>>> as core::iter::traits::iterator::Iterator>::try_fold<(), {closure@core::iter::traits::iterator::Iterator::try_for_each::call<Block, core::ops::control_flow::ControlFlow<Block>, fn(Block) -> core::ops::control_flow::ControlFlow<Block> {core::ops::control_flow::ControlFlow::<Block>::Break}>::{closure#0}}, core::ops::control_flow::ControlFlow<Block>>::{closure#0}}>::{closure#0}}" = type { %"{closure@<core::iter::adapters::GenericShunt<'_, core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>, core::result::Result<core::convert::Infallible, pest::error::Error<Rule>>> as core::iter::traits::iterator::Iterator>::try_fold<(), {closure@core::iter::traits::iterator::Iterator::try_for_each::call<Block, core::ops::control_flow::ControlFlow<Block>, fn(Block) -> core::ops::control_flow::ControlFlow<Block> {core::ops::control_flow::ControlFlow::<Block>::Break}>::{closure#0}}, core::ops::control_flow::ControlFlow<Block>>::{closure#0}}", ptr }"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::IdentType(
+            IdentType(
+                r#""{closure@core::iter::adapters::map::map_try_fold<'_, pest::iterators::pair::Pair<'_, Rule>, core::result::Result<Block, pest::error::Error<Rule>>, (), core::ops::control_flow::ControlFlow<core::ops::control_flow::ControlFlow<Block>>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}, {closure@<core::iter::adapters::GenericShunt<'_, core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>, core::result::Result<core::convert::Infallible, pest::error::Error<Rule>>> as core::iter::traits::iterator::Iterator>::try_fold<(), {closure@core::iter::traits::iterator::Iterator::try_for_each::call<Block, core::ops::control_flow::ControlFlow<Block>, fn(Block) -> core::ops::control_flow::ControlFlow<Block> {core::ops::control_flow::ControlFlow::<Block>::Break}>::{closure#0}}, core::ops::control_flow::ControlFlow<Block>>::{closure#0}}>::{closure#0}}""#.to_owned(),
+                Type::Struct (vec![ Type::Uid(Uid(r#""{closure@<core::iter::adapters::GenericShunt<'_, core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>, core::result::Result<core::convert::Infallible, pest::error::Error<Rule>>> as core::iter::traits::iterator::Iterator>::try_fold<(), {closure@core::iter::traits::iterator::Iterator::try_for_each::call<Block, core::ops::control_flow::ControlFlow<Block>, fn(Block) -> core::ops::control_flow::ControlFlow<Block> {core::ops::control_flow::ControlFlow::<Block>::Break}>::{closure#0}}, core::ops::control_flow::ControlFlow<Block>>::{closure#0}}""#.to_owned())), Type::Id("ptr".to_owned())] ),
+            )
+        ),
+    );
 }
