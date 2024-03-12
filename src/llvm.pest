@@ -100,6 +100,17 @@ arguments = { (argument ~ ("," ~ argument)*)? }
 
 addr_attr = { "unnamed_addr" | "local_unnamed_addr" }
 
+func_attr_memory_value = {
+    "none"
+  | "readwrite"
+  | "read"
+  | "write"
+}
+func_attr_memory_key   = { "argmem" | "inaccessiblemem" }
+func_attr_memory_field = {
+    (func_attr_memory_key ~ ":")? ~ func_attr_memory_value
+}
+
 func_attr = {
     "alignstack" ~ "(" ~ uint ~ ")" // | "alloc-family"="FAMILY" // TODO
 
@@ -120,6 +131,7 @@ func_attr = {
   | "inlinehint"
   | "jumptable" // | "memory(...)" // TODO
 
+  | ("memory" ~ "(" ~ func_attr_memory_field ~ ")")
   | "minsize"
   | "naked"
   | "\"no-inline-line-tables\"" // FIXME: check if surrounding '"'s are required in LLVM IR
@@ -153,8 +165,7 @@ func_attr = {
   | "optsize"
   | "\"patchable-function\"" // FIXME: check if surrounding '"'s are required in LLVM IR
 
-  | "\"probe-stack\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
+  | ("\"probe-stack\"" ~ "=" ~ string)
   | "\"stack-probe-size\"" // FIXME: check if surrounding '"'s are required in LLVM IR
 
   | "\"no-stack-arg-probe\"" // FIXME: check if surrounding '"'s are required in LLVM IR
@@ -326,7 +337,7 @@ stmt_inttoptr     = {
     "inttoptr" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
 stmt_phi_leg      = { "[" ~ val ~ "," ~ uid ~ "]" }
-stmt_phi          = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* }
+stmt_phi          = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* ~ ("," ~ named_meta)* }
 stmt_rhs          = {
     stmt_bop
   | stmt_alloca
@@ -436,8 +447,15 @@ target_datalayout = { "target" ~ "datalayout" ~ "=" ~ string }
 target_triple     = { "target" ~ "triple" ~ "=" ~ string }
 attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ func_attr* ~ "}" }
 
+declarg  = { ty ~ param_attr* }
+declargs = { (declarg ~ ("," ~ declarg)*)? }
+declare  = {
+    "declare" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
+}
+
 definition = {
     function
+  | declare
   | ident_type
   | ident_const
   | source_filename
