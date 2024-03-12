@@ -381,13 +381,15 @@ metadata_string = @{ "!" ~ string }
 metadata_num    = @{ "!" ~ uint }
 metadata_val    =  { metadata_string | (metadata_name ~ metadata_struct?) | (ty ~ int) }
 // TODO: impl inner for struct
-metadata_struct =  { "(" ~ ")" }
-metadata_node   =  {
+metadata_struct_array_entry =  { int | id }
+metadata_struct_array       =  { (metadata_struct_array_entry ~ ("," ~ metadata_struct_array_entry)*)? }
+metadata_struct             =  { "(" ~ (metadata_struct_array) ~ ")" }
+metadata_node               =  {
     "distinct"? ~ "!{" ~ (metadata_val ~ ("," ~ metadata_val)*)? ~ "}"
 }
-metadata_prim   =  { metadata_node | metadata_string }
-metadata_name   = @{ "!" ~ id }
-metadata        =  { metadata_name ~ "=" ~ metadata_node }
+metadata_prim               =  { metadata_node | metadata_string }
+metadata_name               = @{ "!" ~ id }
+metadata                    =  { metadata_name ~ "=" ~ metadata_node }
 
 source_filename   = { "source_filename" ~ "=" ~ string }
 target_datalayout = { "target" ~ "datalayout" ~ "=" ~ string }
