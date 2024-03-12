@@ -212,10 +212,13 @@ bop = {
   | ("urem" | "srem" | "and" | "xor")
 }
 
+const_gep  = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
+const_expr = { const_gep }
+
 poison = { "poison" }
 undef  = { "undef" }
 bool   = { "true" | "false" }
-val    = { int | uid | gid | bool | poison | undef }
+val    = { int | uid | gid | bool | poison | undef | const_expr }
 align  = { "," ~ "align" ~ uint }
 
 tail            = { "tail" | "musttail" | "notail" }
@@ -348,7 +351,7 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
-const_val    =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid) }
+const_val    =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid | int) }
 const_zinit  =  { "zeroinitializer" }
 const_undef  =  { "undef" }
 const_str    = @{ "c" ~ string }
