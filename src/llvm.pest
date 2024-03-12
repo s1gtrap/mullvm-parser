@@ -216,11 +216,24 @@ const_gep      = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("
 const_inttoptr = { "inttoptr" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
 const_expr     = { const_gep | const_inttoptr }
 
-poison = { "poison" }
-undef  = { "undef" }
-null   = { "null" }
-bool   = { "true" | "false" }
-val    = { int | uid | gid | bool | poison | undef | null | const_expr }
+val_poison = { "poison" }
+val_undef  = { "undef" }
+val_null   = { "null" }
+val_true   = { "true" }
+val_false  = { "false" }
+val_struct = { "{" ~ (ty ~ val ~ ("," ~ ty ~ val)*)? ~ "}" }
+val        = {
+    int
+  | uid
+  | gid
+  | val_true
+  | val_false
+  | val_poison
+  | val_undef
+  | val_null
+  | val_struct
+  | const_expr
+}
 
 align = { "," ~ "align" ~ uint }
 
