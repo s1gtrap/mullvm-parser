@@ -112,32 +112,27 @@ func_attr_memory_field = {
 }
 
 func_attr = {
-    "alignstack" ~ "(" ~ uint ~ ")" // | "alloc-family"="FAMILY" // TODO
-
-  | "allockind" ~ "(" ~ string ~ ")"
-  | "allocsize" ~ "(" ~ uint ~ ("," ~ uint) ~ ")"
+    ("alignstack" ~ "(" ~ uint ~ ")")
+  | ("\"alloc-family\"" ~ "=" ~ string)
+  | ("allockind" ~ "(" ~ string ~ ")")
+  | ("allocsize" ~ "(" ~ uint ~ ("," ~ uint)* ~ ")")
   | "alwaysinline"
   | "builtin"
   | "cold"
   | "convergent"
   | "disable_sanitizer_instrumentation"
-  | "\"dontcall-error\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
-  | "\"dontcall-warn\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
+  | "\"dontcall-error\""
+  | "\"dontcall-warn\""
   | "fn_ret_thunk_extern"
   | ("\"frame-pointer\"" ~ "=" ~ string)
   | "hot"
   | "inlinehint"
-  | "jumptable" // | "memory(...)" // TODO
-
+  | "jumptable"
   | ("memory" ~ "(" ~ func_attr_memory_field ~ ")")
   | "minsize"
   | "naked"
-  | "\"no-inline-line-tables\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
-  | "no-jump-tables" // FIXME: check if this is truly w/o '"'s (missing in the docs)
-
+  | "\"no-inline-line-tables\""
+  | "\"no-jump-tables\""
   | "nobuiltin"
   | "nocallback"
   | "noduplicate"
@@ -149,8 +144,7 @@ func_attr = {
   | "noprofile"
   | "skipprofile"
   | "noredzone"
-  | "indirect-tls-seg-refs" // FIXME: check if this is truly w/o '"'s (missing in the docs)
-
+  | "\"indirect-tls-seg-refs\""
   | "noreturn"
   | "norecurse"
   | "willreturn"
@@ -163,13 +157,10 @@ func_attr = {
   | "optforfuzzing"
   | "optnone"
   | "optsize"
-  | "\"patchable-function\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
+  | "\"patchable-function\""
   | ("\"probe-stack\"" ~ "=" ~ string)
-  | "\"stack-probe-size\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
-  | "\"no-stack-arg-probe\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
+  | "\"stack-probe-size\""
+  | "\"no-stack-arg-probe\""
   | "returns_twice"
   | "safestack"
   | "sanitize_address"
@@ -183,33 +174,25 @@ func_attr = {
   | "sspstrong"
   | "sspreq"
   | "strictfp"
-  | "\"denormal-fp-math\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+  | "\"denormal-fp-math\""
+  | "\"denormal-fp-math-f32\""
+  | "\"thunk\"" // FIXME: check if surrounding '"'s are required since it has no dashes!?
 
-  | "\"denormal-fp-math-f32\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
-  | "\"thunk\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
-  | "\"tls-load-hoist\"" // FIXME: check if surrounding '"'s are required in LLVM IR
-
+  | "\"tls-load-hoist\""
   | "uwtable" ~ ("sync" | "async")?
   | "nocf_check"
   | "shadowcallstack"
   | "mustprogress" // | "warn-stack-size"="<threshold>" // TODO
 
   | "vscale_range" ~ "(" ~ uint ~ ("," ~ uint) ~ ")"
-  | "\"nooutline\"" // FIXME: check if surrounding '"'s are required in LLVM IR
+  | "\"nooutline\"" // FIXME: check if surrounding '"'s are required since it has no dashes!?
 
-  | ("\"min-legal-vector-width\"" ~ "=" ~ string) // FIXME: find docs for this
-
-  | ("\"no-trapping-math\"" ~ "=" ~ string) // FIXME: find docs for this
-
-  | ("\"stack-protector-buffer-size\"" ~ "=" ~ string) // FIXME: find docs for this
-
-  | ("\"target-cpu\"" ~ "=" ~ string) // FIXME: find docs for this
-
-  | ("\"target-features\"" ~ "=" ~ string) // FIXME: find docs for this
-
-  | ("\"tune-cpu\"" ~ "=" ~ string) // FIXME: find docs for this
+  | ("\"min-legal-vector-width\"" ~ "=" ~ string)
+  | ("\"no-trapping-math\"" ~ "=" ~ string)
+  | ("\"stack-protector-buffer-size\"" ~ "=" ~ string)
+  | ("\"target-cpu\"" ~ "=" ~ string)
+  | ("\"target-features\"" ~ "=" ~ string)
+  | ("\"tune-cpu\"" ~ "=" ~ string)
 }
 
 attr_group = @{ "#" ~ uint }
