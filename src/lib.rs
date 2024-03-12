@@ -739,29 +739,6 @@ fn test_parse_stmt() {
             }),
         ),
     );
-    /*assert_eq!(
-        Stmt::try_from(
-            LLVMParser::parse(
-                Rule::stmt,
-                r#"%_8 = alloca { %"pest::iterators::pair::Pair<'_, Rule>" }, align 8"#,
-            )
-            .unwrap()
-            .next()
-            .unwrap(),
-        )
-        .unwrap(),
-        Stmt(
-            None,
-            StmtRhs::Store(Store {
-                volatile: false,
-                ty: Type::Id("ptr".to_owned()),
-                val: Val::Uid(Uid("self".to_owned())),
-                pty: Type::Id("ptr".to_owned()),
-                pval: Val::Uid(Uid("self.dbg.spill".to_owned())),
-                align: Some(8),
-            }),
-        ),
-    );*/
     assert_eq!(
         Stmt::try_from(
             LLVMParser::parse(

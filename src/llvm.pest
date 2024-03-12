@@ -7,7 +7,7 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" | (";" ~ (!NEWLINE ~ ANY)* ~ NEWLINE) }
 uint = @{ "0" | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
 int  = @{ uint | ("-" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) }
 
-id  = @{ (ASCII_ALPHANUMERIC | "_" | ".")+ }
+id  = @{ (ASCII_ALPHANUMERIC | "_" | "." | "-")+ }
 uid = @{ "%" ~ (string | id) }
 gid = @{ "@" ~ (string | id) }
 
@@ -212,14 +212,17 @@ bop = {
   | ("urem" | "srem" | "and" | "xor")
 }
 
-const_gep  = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
-const_expr = { const_gep }
+const_gep      = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
+const_inttoptr = { "inttoptr" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
+const_expr     = { const_gep | const_inttoptr }
 
 poison = { "poison" }
 undef  = { "undef" }
+null   = { "null" }
 bool   = { "true" | "false" }
-val    = { int | uid | gid | bool | poison | undef | const_expr }
-align  = { "," ~ "align" ~ uint }
+val    = { int | uid | gid | bool | poison | undef | null | const_expr }
+
+align = { "," ~ "align" ~ uint }
 
 tail            = { "tail" | "musttail" | "notail" }
 fast_math_flags = {
@@ -241,16 +244,16 @@ param_metadata = { "metadata" }
 param_ty       = { param_metadata? ~ ty }
 params         = { (param ~ ("," ~ param)*)? }
 
-stmt_bop          = { bop ~ ty ~ val ~ "," ~ val }
+stmt_bop          = { bop ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)* }
 stmt_alloca       = {
-    "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)?
+    "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)? ~ ("," ~ metadata_name ~ metadata_num)*
 }
 stmt_store        = {
     // TODO: !nontemporal, !invariant.group
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
 stmt_call         = {
-    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ ("," ~ metadata_name ~ metadata_num)*
+    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
 inbounds          = { "inbounds" }
 inrange           = { "inrange" }
@@ -293,16 +296,24 @@ resultty          = { ty }
 cleanup           = { "cleanup" }
 clause            = { clause_catch | clause_filter }
 clause_catch      = { "catch" ~ const_val }
-clause_filter     = { "filter" }
+clause_filter     = { "filter" ~ const_val }
 stmt_landingpad   = {
     "landingpad" ~ resultty ~ (clause+ | (cleanup ~ clause*))
 }
 stmt_extractvalue = {
-    "extractvalue" ~ ty ~ val ~ "," ~ val ~ ("," ~ val)*
+    "extractvalue" ~ ty ~ val ~ "," ~ val ~ ("," ~ val)* ~ ("," ~ named_meta)*
 }
 stmt_trunc        = {
     "trunc" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
+stmt_zext         = {
+    "zext" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
+stmt_inttoptr     = {
+    "inttoptr" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
+stmt_phi_leg      = { "[" ~ val ~ "," ~ uid ~ "]" }
+stmt_phi          = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* }
 stmt_rhs          = {
     stmt_bop
   | stmt_alloca
@@ -317,6 +328,9 @@ stmt_rhs          = {
   | stmt_landingpad
   | stmt_extractvalue
   | stmt_trunc
+  | stmt_zext
+  | stmt_inttoptr
+  | stmt_phi
 }
 
 stmt = {
@@ -328,15 +342,21 @@ term_br          = { "br" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)
 term_cbr         = { "br" ~ "i1" ~ val ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
 term_unreachable = { "unreachable" ~ ("," ~ metadata_name ~ metadata_num)* }
 term_invoke      = {
-    "invoke" ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ arguments ~ ")" ~ func_attr* ~ "to" ~ "label" ~ uid ~ "unwind" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)*
+    (uid ~ "=")? ~ "invoke" ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ "to" ~ "label" ~ uid ~ "unwind" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)*
 }
 term_resume      = {
     "resume" ~ ty ~ val ~ ("," ~ metadata_name ~ metadata_num)*
 }
-term             = { term_ret | term_br | term_cbr | term_unreachable | term_invoke | term_resume }
+term_switch_cond = {
+    ty ~ val ~ "," ~ "label" ~ uid
+}
+term_switch      = {
+    "switch" ~ ty ~ val ~ "," ~ "label" ~ uid ~ "[" ~ term_switch_cond+ ~ "]" ~ ("," ~ metadata_name ~ metadata_num)*
+}
+term             = { term_ret | term_br | term_cbr | term_unreachable | term_invoke | term_resume | term_switch }
 
 label = {
-    id ~ ":"
+    (id | string) ~ ":"
 }
 
 block      = {
