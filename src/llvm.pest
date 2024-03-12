@@ -411,15 +411,19 @@ ident_const = {
     gid ~ "=" ~ ((linkage_int? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*) | (linkage_ext ~ addr_attr? ~ const_attr ~ ty ~ align? ~ ("," ~ named_meta)*))
 }
 
+distinct = { "distinct" }
+
 metadata_string = @{ "!" ~ string }
 metadata_num    = @{ "!" ~ uint }
-metadata_val    =  { metadata_string | (metadata_name ~ metadata_struct?) | (ty ~ int) }
+metadata_val    =  { metadata_string | (metadata_name ~ metadata_struct?) | (ty ~ int) | string | val }
+metadata_field  =  { id ~ ":" ~ (metadata_val | (id ~ ("|" ~ id)*)) }
 // TODO: impl inner for struct
 metadata_struct_array_entry =  { int | id }
 metadata_struct_array       =  { (metadata_struct_array_entry ~ ("," ~ metadata_struct_array_entry)*)? }
 metadata_struct             =  { "(" ~ (metadata_struct_array) ~ ")" }
 metadata_node               =  {
-    "distinct"? ~ "!{" ~ (metadata_val ~ ("," ~ metadata_val)*)? ~ "}"
+    (distinct? ~ metadata_name ~ "(" ~ (metadata_field ~ ("," ~ metadata_field)*) ~ ")")
+  | (distinct? ~ "!{" ~ (metadata_val ~ ("," ~ metadata_val)*)? ~ "}")
 }
 metadata_prim               =  { metadata_node | metadata_string }
 metadata_name               = @{ "!" ~ id }
