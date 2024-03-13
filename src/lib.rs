@@ -1594,8 +1594,125 @@ fn test_parse_ident_const() {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Declaration {
+    linkage: Option<Linkage>,
+    vis: Option<Visibility>,
+    cconv: Option<Cconv>,
+    ret_attrs: Vec<ParamAttr>,
+    ret: Type,
+    name: Gid,
+    args: Vec<(Type, Vec<ParamAttr>)>,
+    addr_attr: Option<AddrAttr>,
+    addr_space: Option<AddrSpace>,
+    func_attrs: Vec<FuncAttr>,
+    //| attr_group)*
+    //personality: Option<Personality>,
+    //named_meta*: ???
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        //linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
+        let mut inner = pair.into_inner();
+        let linkage = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let ret_attrs = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::param_attrs => inner
+                .next()
+                .unwrap()
+                .into_inner()
+                .map(|pair| pair.try_into())
+                .collect::<Result<_, _>>()?,
+            _ => vec![],
+        };
+        let ret = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::ty => inner.next().unwrap().try_into()?,
+            p => unreachable!("{p:?}"),
+        };
+        let name = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::gid => inner.next().unwrap().try_into()?,
+            _ => unreachable!(),
+        };
+        let args = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::declargs => {
+                let inner = inner.next().unwrap().into_inner();
+                inner
+                    .map(|p| {
+                        let mut inner = p.into_inner();
+                        let ty = Type::try_from(inner.next().unwrap())?;
+                        let attrs = if inner.peek().unwrap().as_rule() == Rule::param_attrs {
+                            inner
+                                .next()
+                                .unwrap()
+                                .into_inner()
+                                .map(ParamAttr::try_from)
+                                .collect::<Result<Vec<_>, _>>()?
+                        } else {
+                            vec![]
+                        };
+                        Ok((ty, attrs))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            }
+            _ => unreachable!(),
+        }?;
+        let addr_attr = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::addr_attr => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let addr_space = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::addr_space => {
+                None // TODO: impl
+            }
+            _ => None,
+        };
+        /*loop {
+            if inner.peek().unwrap().as_rule() == Rule::func_attr
+                || inner.peek().unwrap().as_rule() == Rule::attr_group
+                || inner.peek().unwrap().as_rule() == Rule::personality
+                || inner.peek().unwrap().as_rule() == Rule::named_meta
+            {
+                inner.next().unwrap();
+            } else {
+                break;
+            }
+        }*/
+        Ok(Declaration {
+            linkage,
+            vis: None,   // TODO: impl
+            cconv: None, // TODO: impl
+            ret_attrs,
+            ret,
+            name,
+            args,       // TODO: impl
+            addr_attr,  // TODO: impl
+            addr_space, // TODO: impl
+            func_attrs: vec![], // TODO: impl
+                        //section: Option<String>,
+                        //partition: Option<String>,
+                        //[comdat [($name)]]
+                        //[align N]
+                        //[gc]
+                        //[prefix Constant]
+                        //[prologue Constant]
+                        //[personality Constant]
+                        //(!name !N)*
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Definition {
     Function(Function),
+    Declaration(Declaration),
     IdentType(IdentType),
     SourceFilename(String),
     TargetDatalayout(String),
@@ -1613,6 +1730,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
         let item = inner.next().unwrap();
         match item.as_rule() {
             Rule::function => Ok(Definition::Function(item.try_into()?)),
+            Rule::declare => Ok(Definition::Declaration(item.try_into()?)),
             Rule::ident_type => Ok(Definition::IdentType(item.try_into()?)),
             Rule::ident_const => Ok(Definition::Const(item.try_into()?)),
             Rule::source_filename => Ok(Definition::SourceFilename(

@@ -421,10 +421,10 @@ target_datalayout = { "target" ~ "datalayout" ~ "=" ~ string }
 target_triple     = { "target" ~ "triple" ~ "=" ~ string }
 attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ func_attr* ~ "}" }
 
-declarg  = { ty ~ param_attr* }
+declarg  = { ty ~ param_attrs }
 declargs = { (declarg ~ ("," ~ declarg)*)? }
 declare  = {
-    "declare" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
+    "declare" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
 }
 
 definition = {
