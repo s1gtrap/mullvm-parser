@@ -1064,9 +1064,18 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             }
             _ => None,
         };
+        let ret_attrs = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::param_attrs => iterator
+                .next()
+                .unwrap()
+                .into_inner()
+                .map(|pair| pair.try_into())
+                .collect::<Result<_, _>>()?,
+            _ => vec![],
+        };
         let ret = match iterator.peek() {
             Some(pair) if pair.as_rule() == Rule::ty => iterator.next().unwrap().try_into()?,
-            _ => unreachable!(),
+            p => unreachable!("{p:?}"),
         };
         let name = match iterator.peek() {
             Some(pair) if pair.as_rule() == Rule::gid => iterator.next().unwrap().try_into()?,
@@ -1124,11 +1133,11 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Function {
             linkage,
-            preemp: None,      // TODO: impl
-            vis: None,         // TODO: impl
-            store: None,       // TODO: impl
-            cconv: None,       // TODO: impl
-            ret_attrs: vec![], // TODO: impl
+            preemp: None, // TODO: impl
+            vis: None,    // TODO: impl
+            store: None,  // TODO: impl
+            cconv: None,  // TODO: impl
+            ret_attrs,
             ret,
             name,
             args,               // TODO: impl

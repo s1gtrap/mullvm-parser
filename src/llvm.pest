@@ -376,7 +376,7 @@ block_body = { stmt* }
 personality = { "personality" ~ ty ~ gid }
 
 function = {
-    "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
+    "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
 const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_packed | gid | int) ~ !"=")? }
