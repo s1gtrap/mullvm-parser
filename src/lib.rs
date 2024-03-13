@@ -1763,8 +1763,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
                     .as_str()
                     .to_owned(),
             )),
-            Rule::attributes => todo!(),
-            Rule::metadata => todo!(),
+            Rule::attributes => Ok(Definition::Attributes),
+            Rule::metadata => Ok(Definition::Metadata),
             p => unreachable!("{p:?}"),
         }
     }
