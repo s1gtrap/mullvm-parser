@@ -149,7 +149,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        println!("{:?}", pair);
         assert_eq!(pair.as_rule(), Rule::ty);
         let mut inner = pair.into_inner();
         let pair = inner.next().unwrap();
@@ -549,7 +548,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        println!("{:?}", pair);
         match pair.as_rule() {
             Rule::val => {
                 let mut inner = pair.into_inner();
@@ -1405,7 +1403,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             _ => None,
         };
         let const_attr = ConstAttr::try_from(inner.next().unwrap())?;
-        println!("const_attr: {const_attr:?}");
         let const_val_opt_pair = inner.next().unwrap();
         assert_eq!(const_val_opt_pair.as_rule(), Rule::const_val_opt);
         let mut const_val_opt_inner = const_val_opt_pair.into_inner();
