@@ -500,6 +500,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        println!("{:?}", pair);
         match pair.as_rule() {
             Rule::val => {
                 let mut inner = pair.into_inner();
@@ -762,6 +763,7 @@ pub enum StmtRhs {
     Alloca(Alloca),
     Store(Store),
     Call(Call),
+    Todo(String),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
@@ -774,6 +776,19 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
             Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
+            Rule::stmt_bop
+            | Rule::stmt_gep
+            | Rule::stmt_load
+            | Rule::stmt_ptrtoint
+            | Rule::stmt_icmp
+            | Rule::stmt_select
+            | Rule::stmt_insertvalue
+            | Rule::stmt_landingpad
+            | Rule::stmt_extractvalue
+            | Rule::stmt_trunc
+            | Rule::stmt_zext
+            | Rule::stmt_inttoptr
+            | Rule::stmt_phi => Ok(StmtRhs::Todo(pair.as_str().to_owned())),
             p => unreachable!("{:?}", p),
         }
     }
@@ -897,6 +912,7 @@ pub enum Term {
     Cbr(Uid, Uid, Uid),
     Ret(Type, Option<Val>),
     Unreachable,
+    Todo(String),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Term {
@@ -909,9 +925,24 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Term {
             Rule::term_ret => {
                 let mut inner = pair.into_inner();
                 let ty = Type::try_from(inner.next().unwrap()).unwrap();
-                let val = inner.next().map(|pair| Val::try_from(pair).unwrap());
+                let val = inner
+                    .next()
+                    .and_then(|pair| {
+                        if pair.as_rule() == Rule::val {
+                            Some(Ok(Val::try_from(pair).ok()?))
+                        } else {
+                            None
+                        }
+                    })
+                    .transpose()?;
                 Ok(Term::Ret(ty, val))
             }
+            Rule::term_br
+            | Rule::term_cbr
+            | Rule::term_unreachable
+            | Rule::term_invoke
+            | Rule::term_resume
+            | Rule::term_switch => Ok(Term::Todo(pair.as_str().to_owned())),
             _ => unreachable!(),
         }
     }
@@ -942,7 +973,10 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Block {
                         let term = inner.next().unwrap();
                         Ok(Block {
                             label,
-                            insns: body.into_inner().map(|p| panic!("{:?}", p)).collect(),
+                            insns: body
+                                .into_inner()
+                                .map(|p| Stmt::try_from(p))
+                                .collect::<Result<_, _>>()?,
                             term: term.try_into().unwrap(),
                         })
                     }
