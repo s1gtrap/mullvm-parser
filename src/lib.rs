@@ -1198,6 +1198,7 @@ pub enum ConstVal {
     Struct(Vec<ConstVal>),
     Packed(Vec<ConstVal>),
     Zinit,
+    Undef,
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
@@ -1219,6 +1220,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
             )),
             Rule::gid => Ok(ConstVal::Gid(Gid::try_from(pair)?)),
             Rule::const_zinit => Ok(ConstVal::Zinit),
+            Rule::const_undef => Ok(ConstVal::Undef),
             p => unreachable!("{p:?}"),
         }
     }
@@ -1288,6 +1290,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
                 ))
             }
             Some(val) if val.as_rule() == Rule::const_zinit => Some(ConstVal::Zinit),
+            Some(val) if val.as_rule() == Rule::const_undef => Some(ConstVal::Undef),
             Some(_) => todo!(),
             None => None,
         };
@@ -1686,11 +1689,11 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             addr_space: None,
             externally_initialized: None,
             const_attr: ConstAttr::Constant,
-            ty: Type::Packed(vec![]),
-            name: Gid("alloc_513570631223a12912d85da2bec3b15a".to_owned()),
+            ty: Type::Packed(vec![Type::Array(8, Box::new(Type::Id("i8".to_owned()))),Type::Array(8, Box::new(Type::Id("i8".to_owned())))]),
+            name: Gid("1".to_owned()),
             initializer_constant: None,
             align: Some(8),
-            val: Some(ConstVal::Zinit),
+            val: Some(ConstVal::Packed(vec![ConstVal::Zinit, ConstVal::Undef])),
         }),
     );
     assert_eq!(
