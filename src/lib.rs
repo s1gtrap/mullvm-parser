@@ -490,10 +490,52 @@ impl<'i> TryFrom<Pair<'i, Rule>> for AddrAttr {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum ConstExpr {
+    Gep(bool, Type, Vec<ConstVal>),
+    Inttoptr(ConstVal, Type),
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let pair = inner.next().unwrap();
+        match pair.as_rule() {
+            Rule::const_gep => {
+                let mut inner = pair.into_inner();
+                let inbounds = if inner.peek().unwrap().as_rule() == Rule::inbounds {
+                    inner.next().unwrap();
+                    true
+                } else {
+                    false
+                };
+                let ty = inner.next().unwrap().try_into()?;
+                let indices = inner.map(|p| p.try_into()).collect::<Result<_, _>>()?;
+                Ok(ConstExpr::Gep(inbounds, ty, indices))
+            }
+            Rule::const_inttoptr => {
+                let mut inner = pair.into_inner();
+                let val = inner.next().unwrap().try_into()?;
+                let ty = inner.next().unwrap().try_into()?;
+                Ok(ConstExpr::Inttoptr(val, ty))
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Val {
     Int(i128),
     Uid(Uid),
     Gid(Gid),
+    True,
+    False,
+    Poison,
+    Undef,
+    Null,
+    ConstExpr(ConstExpr),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Val {
@@ -509,6 +551,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                     Rule::int => Ok(Val::Int(pair.as_str().parse().unwrap())),
                     Rule::uid => Ok(Val::Uid(pair.try_into()?)),
                     Rule::gid => Ok(Val::Gid(pair.try_into()?)),
+                    Rule::val_true => Ok(Val::True),
+                    Rule::val_false => Ok(Val::False),
+                    Rule::val_poison => Ok(Val::Poison),
+                    Rule::val_undef => Ok(Val::Undef),
+                    Rule::val_null => Ok(Val::Null),
+                    Rule::const_expr => Ok(Val::ConstExpr(ConstExpr::try_from(pair)?)),
                     p => unreachable!("{:?}", p),
                 }
             }
@@ -1259,6 +1307,7 @@ fn test_parse_ident_type() {
 #[derive(Debug, PartialEq)]
 pub enum ConstVal {
     String(String),
+    Int(i128),
     Gid(Gid),
     //Array(usize, Box<ConstVal>),
     Struct(Vec<ConstVal>),
@@ -1271,7 +1320,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut inner = pair.into_inner();
+        let inner = pair.into_inner();
         let pair = inner.skip(1).next().unwrap();
         match pair.as_rule() {
             Rule::const_str => Ok(ConstVal::String(
@@ -1284,6 +1333,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
                     .as_str()
                     .to_owned(),
             )),
+            Rule::int => Ok(ConstVal::Int(pair.as_str().parse().unwrap())),
             Rule::gid => Ok(ConstVal::Gid(Gid::try_from(pair)?)),
             Rule::const_zinit => Ok(ConstVal::Zinit),
             Rule::const_undef => Ok(ConstVal::Undef),
@@ -1350,7 +1400,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
                 Some(ConstVal::String(str_inner.as_str().to_owned()))
             }
             Some(val) if val.as_rule() == Rule::const_packed => {
-                let mut inner = val.into_inner();
+                let inner = val.into_inner();
                 Some(ConstVal::Packed(
                     inner.map(|p| p.try_into()).collect::<Result<_, _>>()?,
                 ))
