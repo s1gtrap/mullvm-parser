@@ -1062,6 +1062,29 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             }
             _ => unreachable!(),
         }?;
+        let addr_attr = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::addr_attr => {
+                Some(iterator.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let addr_space = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::addr_space => {
+                None // TODO: impl
+            }
+            _ => None,
+        };
+        loop {
+            if iterator.peek().unwrap().as_rule() == Rule::func_attr
+                || iterator.peek().unwrap().as_rule() == Rule::attr_group
+                || iterator.peek().unwrap().as_rule() == Rule::personality
+                || iterator.peek().unwrap().as_rule() == Rule::named_meta
+            {
+                iterator.next().unwrap();
+            } else {
+                break;
+            }
+        }
         let blocks = iterator
             .map(Block::try_from)
             .collect::<Result<Vec<_>, _>>()?;
@@ -1075,8 +1098,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             ret,
             name,
             args,               // TODO: impl
-            addr_attr: None,    // TODO: impl
-            addr_space: None,   // TODO: impl
+            addr_attr,          // TODO: impl
+            addr_space,         // TODO: impl
             func_attrs: vec![], // TODO: impl
             //section: Option<String>,
             //partition: Option<String>,
