@@ -55,8 +55,9 @@ cconv = {
 }
 
 star      = { "*" }
-ty        = { (id | uid | ty_array | ty_struct | ty_packed) ~ star* }
+ty        = { (id | uid | ty_array | ty_vector | ty_struct | ty_packed) ~ star* }
 ty_array  = { "[" ~ uint ~ "x" ~ ty ~ "]" }
+ty_vector = { "<" ~ uint ~ "x" ~ ty ~ ">" }
 ty_struct = { "{" ~ (ty ~ ("," ~ ty)*)? ~ "}" }
 ty_packed = { "<{" ~ (ty ~ ("," ~ ty)*)? ~ "}>" }
 

@@ -61,7 +61,7 @@ fn test_parse_module() {
                         name: Gid("alloc_0d59fa4b6ac8db87cb5ee133fbad49f4".to_owned()),
                         initializer_constant: None,
                         align: Some(8),
-                        val: Some(ConstVal::Packed(vec![])),
+                        val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_d4049da30c3f108dbf45b257cd36e57e".to_owned())), ConstVal::String("L\\00\\00\\00\\00\\00\\00\\00\\B8\\0B\\00\\00\\0D\\00\\00\\00".to_owned())])),
                     },
                 ),
                 Definition::Const(
@@ -79,7 +79,7 @@ fn test_parse_module() {
                         name: Gid("alloc_452aca60f8224f0cb24bfd27ed975a06".to_owned()),
                         initializer_constant: None,
                         align: Some(8),
-                        val: Some(ConstVal::Packed(vec![])),
+                        val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_d4049da30c3f108dbf45b257cd36e57e".to_owned())), ConstVal::String("L\\00\\00\\00\\00\\00\\00\\00>\\08\\00\\00$\\00\\00\\00".to_owned())])),
                     },
                 ),
             ],
@@ -141,6 +141,7 @@ pub enum Type {
     Uid(Uid),
     Ptr(Box<Type>),
     Array(usize, Box<Type>),
+    Vector(usize, Box<Type>),
     Struct(Vec<Type>),
     Packed(Vec<Type>),
 }
@@ -161,6 +162,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
                 let elems = inner.next().unwrap().as_str().parse().unwrap();
                 let ty = Type::try_from(inner.next().unwrap())?;
                 Type::Array(elems, Box::new(ty))
+            }
+            Rule::ty_vector => {
+                let mut inner = pair.into_inner();
+                let elems = inner.next().unwrap().as_str().parse().unwrap();
+                let ty = Type::try_from(inner.next().unwrap())?;
+                Type::Vector(elems, Box::new(ty))
             }
             Rule::ty_struct => {
                 let inner = pair.into_inner();
@@ -699,6 +706,47 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Store {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Load {
+    volatile: bool,
+    ty: Type,
+    pty: Type,
+    pval: Val,
+    align: Option<usize>,
+}
+impl<'i> TryFrom<Pair<'i, Rule>> for Load {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let volatile = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::volatile => {
+                inner.next().unwrap();
+                true
+            }
+            _ => false,
+        };
+        let ty = Type::try_from(inner.next().unwrap())?;
+        let pty = Type::try_from(inner.next().unwrap())?;
+        let pval = Val::try_from(inner.next().unwrap())?;
+        let align = inner.next().map(|pair| {
+            pair.into_inner()
+                .next()
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("failed to parse align (uint)")
+        });
+        Ok(Load {
+            volatile,
+            ty,
+            pty,
+            pval,
+            align,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Tail {
     Tail,
     Musttail,
@@ -832,6 +880,7 @@ pub enum StmtRhs {
     Alloca(Alloca),
     Store(Store),
     Call(Call),
+    Load(Load),
     Todo(String),
 }
 
@@ -845,9 +894,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
             Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
+            Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
             Rule::stmt_bop
             | Rule::stmt_gep
-            | Rule::stmt_load
             | Rule::stmt_ptrtoint
             | Rule::stmt_icmp
             | Rule::stmt_select
@@ -899,6 +948,25 @@ fn test_parse_stmt_rhs() {
             pty: Type::Id("ptr".to_owned()),
             pval: Val::Uid(Uid("self.dbg.spill".to_owned())),
             align: Some(8),
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "load <4 x i8>, ptr %utf8_encoded, align 1, !dbg !47419",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Load(Load {
+            volatile: false,
+            ty: Type::Vector(4, Box::new(Type::Id("i8".to_owned()))),
+            pty: Type::Id("ptr".to_owned()),
+            pval: Val::Uid(Uid("utf8_encoded".to_owned())),
+            align: Some(1),
         }),
     );
 }
@@ -970,6 +1038,28 @@ fn test_parse_stmt() {
                 args: vec![],
                 fn_attrs: vec![],
                 // [ operand bundles ] // TODO: impl
+            }),
+        ),
+    );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                "%15 = load <4 x i8>, ptr %utf8_encoded, align 1, !dbg !47419",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("15".to_owned())),
+            StmtRhs::Load(Load {
+                volatile: false,
+                ty: Type::Vector(4, Box::new(Type::Id("i8".to_owned()))),
+                pty: Type::Id("ptr".to_owned()),
+                pval: Val::Uid(Uid("utf8_encoded".to_owned())),
+                align: Some(1),
             }),
         ),
     );
