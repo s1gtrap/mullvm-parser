@@ -535,6 +535,7 @@ pub enum Val {
     Poison,
     Undef,
     Null,
+    Struct(Vec<Val>),
     ConstExpr(ConstExpr),
 }
 
@@ -556,6 +557,13 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                     Rule::val_poison => Ok(Val::Poison),
                     Rule::val_undef => Ok(Val::Undef),
                     Rule::val_null => Ok(Val::Null),
+                    Rule::val_struct => Ok(Val::Struct(
+                        pair.into_inner()
+                            .skip(1)
+                            .step_by(2)
+                            .map(Val::try_from)
+                            .collect::<Result<_, _>>()?,
+                    )),
                     Rule::const_expr => Ok(Val::ConstExpr(ConstExpr::try_from(pair)?)),
                     p => unreachable!("{:?}", p),
                 }
