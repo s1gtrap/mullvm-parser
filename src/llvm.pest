@@ -60,7 +60,7 @@ ty_array  = { "[" ~ uint ~ "x" ~ ty ~ "]" }
 ty_struct = { "{" ~ (ty ~ ("," ~ ty)*)? ~ "}" }
 ty_packed = { "<{" ~ (ty ~ ("," ~ ty)*)? ~ "}>" }
 
-param_attr = {
+param_attr  = {
     "zeroext"
   | "signext"
   | "inreg"
@@ -94,8 +94,9 @@ param_attr = {
   | "writable"
   | "dead_on_unwind"
 }
+param_attrs = { param_attr* }
 
-argument  = { ty ~ param_attr* ~ uid }
+argument  = { ty ~ param_attrs ~ uid }
 arguments = { (argument ~ ("," ~ argument)*)? }
 
 addr_attr = { "unnamed_addr" | "local_unnamed_addr" }
@@ -378,37 +379,23 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attr* ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
-const_val    =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid | int) }
-const_zinit  =  { "zeroinitializer" }
-const_undef  =  { "undef" }
-const_str    = @{ "c" ~ string }
-const_packed =  { "<{" ~ (const_val ~ (", " ~ const_val)*) ~ "}>" }
-
-const_attr = { "global" | "constant" }
+const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_packed | gid | int) ~ !"=")? }
+const_val     =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid | int) }
+const_zinit   =  { "zeroinitializer" }
+const_undef   =  { "undef" }
+const_str     = @{ "c" ~ string }
+const_packed  =  { "<{" ~ (const_val ~ (", " ~ const_val)*) ~ "}>" }
+const_attr    =  { "global" | "constant" }
 
 named_meta_name = @{ "!" ~ id }
 named_meta_num  = @{ "!" ~ uint }
 named_meta      =  { named_meta_name ~ named_meta_num }
 
-linkage_int = {
-    "private"
-  | "internal"
-  | "available_externally"
-  | "linkonce"
-  | "weak"
-  | "common"
-  | "appending"
-  | "extern_weak"
-  | "linkonce_odr"
-  | "weak_odr"
-}
-linkage_ext = { "external" }
-
 ident_type  = {
     uid ~ "=" ~ "type" ~ ty
 }
 ident_const = {
-    gid ~ "=" ~ ((linkage_int? ~ addr_attr? ~ const_attr ~ const_val ~ align? ~ ("," ~ named_meta)*) | (linkage_ext ~ addr_attr? ~ const_attr ~ ty ~ align? ~ ("," ~ named_meta)*))
+    gid ~ "=" ~ (linkage? ~ addr_attr? ~ const_attr ~ const_val_opt ~ align? ~ ("," ~ named_meta)*)
 }
 
 distinct = { "distinct" }
