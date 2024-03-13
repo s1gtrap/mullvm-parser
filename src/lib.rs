@@ -19,7 +19,13 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Module {
         let inner = pair.into_inner();
         Ok(Module(
             inner
-                .map(|p| Definition::try_from(p))
+                .filter_map(|p| {
+                    if p.as_rule() == Rule::definition {
+                        Some(Definition::try_from(p))
+                    } else {
+                        None
+                    }
+                })
                 .collect::<Result<_, _>>()?,
         ))
     }
