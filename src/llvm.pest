@@ -261,7 +261,7 @@ stmt_store        = {
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
 stmt_call         = {
-    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
+    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attrs ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
 inbounds          = { "inbounds" }
 inrange           = { "inrange" }

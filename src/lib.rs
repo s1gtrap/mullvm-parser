@@ -783,14 +783,23 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
             }
             _ => None,
         };
+        let ret_attrs = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::param_attrs => inner
+                .next()
+                .unwrap()
+                .into_inner()
+                .map(|pair| pair.try_into())
+                .collect::<Result<_, _>>()?,
+            _ => vec![],
+        };
         let ty = inner.next().unwrap().try_into()?;
         let val = inner.next().unwrap().try_into()?;
         Ok(Call {
             tail,
             fast_math_flags,
-            cconv: None,       // TODO: impl
-            ret_attrs: vec![], // TODO: impl
-            addrspace: None,   // TODO: impl
+            cconv: None, // TODO: impl
+            ret_attrs,
+            addrspace: None, // TODO: impl
             ty,
             val,
             args: vec![], // TODO: impl
