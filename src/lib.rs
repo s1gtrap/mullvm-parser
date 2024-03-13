@@ -1197,6 +1197,7 @@ pub enum ConstVal {
     //Array(usize, Box<ConstVal>),
     Struct(Vec<ConstVal>),
     Packed(Vec<ConstVal>),
+    Zinit,
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
@@ -1217,6 +1218,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
                     .to_owned(),
             )),
             Rule::gid => Ok(ConstVal::Gid(Gid::try_from(pair)?)),
+            Rule::const_zinit => Ok(ConstVal::Zinit),
             p => unreachable!("{p:?}"),
         }
     }
@@ -1285,6 +1287,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
                     inner.map(|p| p.try_into()).collect::<Result<_, _>>()?,
                 ))
             }
+            Some(val) if val.as_rule() == Rule::const_zinit => Some(ConstVal::Zinit),
             Some(_) => todo!(),
             None => None,
         };
@@ -1632,7 +1635,63 @@ fn test_parse_definition() {
             initializer_constant: None,
             align: None,
             val: None,
-        },),
+        }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(
+                Rule::definition,
+                r#"@alloc_513570631223a12912d85da2bec3b15a = private unnamed_addr constant <{}> zeroinitializer, align 8"#
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Packed(vec![]),
+            name: Gid("alloc_513570631223a12912d85da2bec3b15a".to_owned()),
+            initializer_constant: None,
+            align: Some(8),
+            val: Some(ConstVal::Zinit),
+        }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(
+                Rule::definition,
+r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroinitializer, [8 x i8] undef }>, align 8"#
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Packed(vec![]),
+            name: Gid("alloc_513570631223a12912d85da2bec3b15a".to_owned()),
+            initializer_constant: None,
+            align: Some(8),
+            val: Some(ConstVal::Zinit),
+        }),
     );
     assert_eq!(
         Definition::try_from(

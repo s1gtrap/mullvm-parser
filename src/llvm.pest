@@ -384,7 +384,7 @@ const_val     =  { ty ~ (const_zinit | const_undef | const_str | const_packed | 
 const_zinit   =  { "zeroinitializer" }
 const_undef   =  { "undef" }
 const_str     = @{ "c" ~ string }
-const_packed  =  { "<{" ~ (const_val ~ (", " ~ const_val)*) ~ "}>" }
+const_packed  =  { "<{" ~ (const_val ~ (", " ~ const_val)*)? ~ "}>" }
 const_attr    =  { "global" | "constant" }
 
 named_meta_name = @{ "!" ~ id }
