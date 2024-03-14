@@ -253,6 +253,13 @@ param_metadata = { "metadata" }
 param_ty       = { param_metadata? ~ ty }
 params         = { (param ~ ("," ~ param)*)? }
 
+ordering = {
+    "unordered"
+  | "monotonic"
+  | "acquire"
+  | "release"
+}
+
 stmt_bop          = { bop ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)* }
 stmt_alloca       = {
     "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)? ~ ("," ~ metadata_name ~ metadata_num)*
@@ -323,6 +330,26 @@ stmt_inttoptr     = {
 }
 stmt_phi_leg      = { "[" ~ val ~ "," ~ uid ~ "]" }
 stmt_phi          = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* ~ ("," ~ named_meta)* }
+atomicrmw_op      = {
+    "xchg"
+  | "add"
+  | "sub"
+  | "and"
+  | "nand"
+  | "or"
+  | "xor"
+  | "max"
+  | "min"
+  | "umax"
+  | "umin"
+  | "fadd"
+  | "fsub"
+  | "fmax"
+  | "fmin"
+  | "uinc_wrap"
+  | "udec_wrap"
+}
+stmt_atomicrmw    = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)* }
 stmt_rhs          = {
     stmt_bop
   | stmt_alloca
@@ -340,6 +367,7 @@ stmt_rhs          = {
   | stmt_zext
   | stmt_inttoptr
   | stmt_phi
+  | stmt_atomicrmw
 }
 
 stmt = {

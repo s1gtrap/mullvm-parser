@@ -870,6 +870,128 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum AtomicrmwOp {
+    Xchg,
+    Add,
+    Sub,
+    And,
+    Nand,
+    Or,
+    Xor,
+    Max,
+    Min,
+    Umax,
+    Umin,
+    Fadd,
+    Fsub,
+    Fmax,
+    Fmin,
+    UincWrap,
+    UdecWrap,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for AtomicrmwOp {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        Ok(match pair.as_str() {
+            "xchg" => AtomicrmwOp::Xchg,
+            "add" => AtomicrmwOp::Add,
+            "sub" => AtomicrmwOp::Sub,
+            "and" => AtomicrmwOp::And,
+            "nand" => AtomicrmwOp::Nand,
+            "or" => AtomicrmwOp::Or,
+            "xor" => AtomicrmwOp::Xor,
+            "max" => AtomicrmwOp::Max,
+            "min" => AtomicrmwOp::Min,
+            "umax" => AtomicrmwOp::Umax,
+            "umin" => AtomicrmwOp::Umin,
+            "fadd" => AtomicrmwOp::Fadd,
+            "fsub" => AtomicrmwOp::Fsub,
+            "fmax" => AtomicrmwOp::Fmax,
+            "fmin" => AtomicrmwOp::Fmin,
+            "uinc_wrap" => AtomicrmwOp::UincWrap,
+            "udec_wrap" => AtomicrmwOp::UdecWrap,
+            _ => unreachable!(),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Ordering {
+    Unordered,
+    Monotonic,
+    Acquire,
+    Release,
+    // AcqRel(acquire+release) // TODO: impl
+    // SeqCst(sequentially consistent) // TODO: impl
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Ordering {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        Ok(match pair.as_str() {
+            "unordered" => Ordering::Unordered,
+            "monotonic" => Ordering::Monotonic,
+            "acquire" => Ordering::Acquire,
+            "release" => Ordering::Release,
+            _ => unreachable!(),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Atomicrmw {
+    volatile: bool,
+    operation: AtomicrmwOp,
+    ptr: Val,
+    ty: Type,
+    val: Val,
+    // [syncscope("<target-scope>")] // TODO: impl
+    ordering: Ordering,
+    align: Option<usize>,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Atomicrmw {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let volatile = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::volatile => {
+                inner.next().unwrap();
+                true
+            }
+            _ => false,
+        };
+        let operation = inner.next().unwrap().try_into()?;
+        let ptr = inner.next().unwrap().try_into()?;
+        let ty = inner.next().unwrap().try_into()?;
+        let val = inner.next().unwrap().try_into()?;
+        let ordering = inner.next().unwrap().try_into()?;
+        let align = inner.next().map(|pair| {
+            pair.into_inner()
+                .next()
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("failed to parse align (uint)")
+        });
+        Ok(Atomicrmw {
+            volatile,
+            operation,
+            ptr,
+            ty,
+            val,
+            // [syncscope("<target-scope>")] // TODO: impl
+            ordering,
+            align,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
     Binop {
         bop: Binop,
@@ -881,6 +1003,7 @@ pub enum StmtRhs {
     Store(Store),
     Call(Call),
     Load(Load),
+    Atomicrmw(Atomicrmw),
     Todo(String),
 }
 
@@ -895,6 +1018,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
+            Rule::stmt_atomicrmw => Ok(StmtRhs::Atomicrmw(Atomicrmw::try_from(pair)?)),
             Rule::stmt_bop
             | Rule::stmt_gep
             | Rule::stmt_ptrtoint
@@ -967,6 +1091,28 @@ fn test_parse_stmt_rhs() {
             pty: Type::Id("ptr".to_owned()),
             pval: Val::Uid(Uid("utf8_encoded".to_owned())),
             align: Some(1),
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "atomicrmw sub ptr %self5, i64 1 release, align 8, !dbg !82546"
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Atomicrmw(Atomicrmw {
+            volatile: false,
+            operation: AtomicrmwOp::Sub,
+            ptr: Val::Uid(Uid("self5".to_owned())),
+            ty: Type::Id("i64".to_owned()),
+            val: Val::Int(1),
+            // [syncscope("<target-scope>")] // TODO: impl
+            ordering: Ordering::Release,
+            align: Some(8),
         }),
     );
 }
