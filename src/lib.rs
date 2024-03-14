@@ -1630,6 +1630,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
             Rule::const_zinit => Ok(ConstVal::Zinit),
             Rule::const_undef => Ok(ConstVal::Undef),
             Rule::const_null => Ok(ConstVal::Null),
+            // TODO: nested structs and packed probably.
             p => unreachable!("{p:?}"),
         }
     }
@@ -1690,6 +1691,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
                     .next()
                     .unwrap();
                 Some(ConstVal::String(str_inner.as_str().to_owned()))
+            }
+            Some(val) if val.as_rule() == Rule::const_struct => {
+                let inner = val.into_inner();
+                Some(ConstVal::Struct(
+                    inner.map(|p| p.try_into()).collect::<Result<_, _>>()?,
+                ))
             }
             Some(val) if val.as_rule() == Rule::const_packed => {
                 let inner = val.into_inner();
@@ -2261,6 +2268,33 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             initializer_constant: None,
             align: None,
             val: Some(ConstVal::Null),
+        }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, "@\"'Float'\" = private constant { i32, i32, i32, [6 x i8] } { i32 1, i32 5, i32 5, [6 x i8] c\"Float\\00\" }")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: Some(Linkage::Private),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Constant,
+            ty: Type::Struct(vec![Type::Id("i32".to_owned()), Type::Id("i32".to_owned()), Type::Id("i32".to_owned()), Type::Array(6, Box::new(Type::Id("i8".to_owned())))]),
+            name: Gid("\"'Float'\"".to_owned()),
+            initializer_constant: None,
+            align: None,
+            val: Some(ConstVal::Struct(vec![
+                ConstVal::Int(1), ConstVal::Int(5), ConstVal::Int(5), ConstVal::String("Float\\00".to_owned()),
+            ])),
         }),
     );
 }
