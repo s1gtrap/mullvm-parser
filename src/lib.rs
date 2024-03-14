@@ -1605,6 +1605,7 @@ pub enum ConstVal {
     Packed(Vec<ConstVal>),
     Zinit,
     Undef,
+    Null,
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
@@ -1628,6 +1629,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
             Rule::gid => Ok(ConstVal::Gid(Gid::try_from(pair)?)),
             Rule::const_zinit => Ok(ConstVal::Zinit),
             Rule::const_undef => Ok(ConstVal::Undef),
+            Rule::const_null => Ok(ConstVal::Null),
             p => unreachable!("{p:?}"),
         }
     }
@@ -1697,6 +1699,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             }
             Some(val) if val.as_rule() == Rule::const_zinit => Some(ConstVal::Zinit),
             Some(val) if val.as_rule() == Rule::const_undef => Some(ConstVal::Undef),
+            Some(val) if val.as_rule() == Rule::const_null => Some(ConstVal::Null),
             Some(_) => todo!(),
             None => None,
         };
@@ -2234,5 +2237,30 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
                 Type::Struct (vec![ Type::Uid(Uid(r#""{closure@<core::iter::adapters::GenericShunt<'_, core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>, core::result::Result<core::convert::Infallible, pest::error::Error<Rule>>> as core::iter::traits::iterator::Iterator>::try_fold<(), {closure@core::iter::traits::iterator::Iterator::try_for_each::call<Block, core::ops::control_flow::ControlFlow<Block>, fn(Block) -> core::ops::control_flow::ControlFlow<Block> {core::ops::control_flow::ControlFlow::<Block>::Break}>::{closure#0}}, core::ops::control_flow::ControlFlow<Block>>::{closure#0}}""#.to_owned())), Type::Id("ptr".to_owned())] ),
             ),
         ),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, "@ARGV_UNSAFE = internal global i8** null")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: Some(Linkage::Internal),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned()))))),
+            name: Gid("ARGV_UNSAFE".to_owned()),
+            initializer_constant: None,
+            align: None,
+            val: Some(ConstVal::Null),
+        }),
     );
 }

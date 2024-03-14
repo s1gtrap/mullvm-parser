@@ -410,12 +410,13 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
-const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_packed | gid | int) ~ !"=")? }
-const_val     =  { ty ~ (const_zinit | const_undef | const_str | const_packed | gid | int) }
+const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_packed | const_null | gid | int) ~ !"=")? }
+const_val     =  { ty ~ (const_zinit | const_undef | const_str | const_packed | const_null | gid | int) }
 const_zinit   =  { "zeroinitializer" }
 const_undef   =  { "undef" }
 const_str     = @{ "c" ~ string }
 const_packed  =  { "<{" ~ (const_val ~ (", " ~ const_val)*)? ~ "}>" }
+const_null    =  { "null" }
 const_attr    =  { "global" | "constant" }
 
 named_meta_name = @{ "!" ~ id }
