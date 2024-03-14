@@ -1011,6 +1011,53 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Fence {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Gep {
+    inbounds: bool,
+    ty: Type,
+    pty: Type,
+    pval: Val,
+    indices: Vec<(bool, Type, Val)>,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Gep {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let inbounds = if inner.peek().unwrap().as_rule() == Rule::inbounds {
+            inner.next().unwrap();
+            true
+        } else {
+            false
+        };
+        let ty = Type::try_from(inner.next().unwrap()).unwrap();
+        let pty = Type::try_from(inner.next().unwrap()).unwrap();
+        let pval = Val::try_from(inner.next().unwrap()).unwrap();
+        let indices = inner
+            .map(|pair| {
+                let mut inner = pair.into_inner();
+                let inrange = if inner.peek().unwrap().as_rule() == Rule::inrange {
+                    inner.next().unwrap();
+                    true
+                } else {
+                    false
+                };
+                let ty = Type::try_from(inner.next().unwrap())?;
+                let val = Val::try_from(inner.next().unwrap())?;
+                Ok((inrange, ty, val))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Gep {
+            inbounds,
+            ty,
+            pty,
+            pval,
+            indices,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
     Binop {
         bop: Binop,
@@ -1024,6 +1071,7 @@ pub enum StmtRhs {
     Load(Load),
     Atomicrmw(Atomicrmw),
     Fence(Fence),
+    Gep(Gep),
     Todo(String),
 }
 
@@ -1040,8 +1088,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
             Rule::stmt_atomicrmw => Ok(StmtRhs::Atomicrmw(Atomicrmw::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
+            Rule::stmt_gep => Ok(StmtRhs::Gep(Gep::try_from(pair)?)),
             Rule::stmt_bop
-            | Rule::stmt_gep
             | Rule::stmt_ptrtoint
             | Rule::stmt_icmp
             | Rule::stmt_select
@@ -1240,6 +1288,31 @@ fn test_parse_stmt() {
                 pty: Type::Id("ptr".to_owned()),
                 pval: Val::Uid(Uid("utf8_encoded".to_owned())),
                 align: Some(1),
+            }),
+        ),
+    );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                r#"%3 = getelementptr inbounds %Example, %Example* %2, i32 0, i32 1"#
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("3".to_owned())),
+            StmtRhs::Gep(Gep {
+                inbounds: true,
+                ty: Type::Uid(Uid("Example".to_owned())),
+                pty: Type::Ptr(Box::new(Type::Uid(Uid("Example".to_owned())))),
+                pval: Val::Uid(Uid("2".to_owned())),
+                indices: vec![
+                    (false, Type::Id("i32".to_owned()), Val::Int(0)),
+                    (false, Type::Id("i32".to_owned()), Val::Int(1)),
+                ],
             }),
         ),
     );
