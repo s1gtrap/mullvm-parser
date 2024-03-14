@@ -992,6 +992,25 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Atomicrmw {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Fence {
+    // [syncscope("<target-scope>")] // TODO: impl
+    ordering: Ordering,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Fence {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let ordering = inner.next().unwrap().try_into()?;
+        Ok(Fence {
+            // [syncscope("<target-scope>")] // TODO: impl
+            ordering,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
     Binop {
         bop: Binop,
@@ -1004,6 +1023,7 @@ pub enum StmtRhs {
     Call(Call),
     Load(Load),
     Atomicrmw(Atomicrmw),
+    Fence(Fence),
     Todo(String),
 }
 
@@ -1019,6 +1039,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
             Rule::stmt_atomicrmw => Ok(StmtRhs::Atomicrmw(Atomicrmw::try_from(pair)?)),
+            Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
             Rule::stmt_bop
             | Rule::stmt_gep
             | Rule::stmt_ptrtoint
@@ -1113,6 +1134,19 @@ fn test_parse_stmt_rhs() {
             // [syncscope("<target-scope>")] // TODO: impl
             ordering: Ordering::Release,
             align: Some(8),
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(Rule::stmt_rhs, "fence acquire, !dbg !82547")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Fence(Fence {
+            // [syncscope("<target-scope>")] // TODO: impl
+            ordering: Ordering::Acquire,
         }),
     );
 }

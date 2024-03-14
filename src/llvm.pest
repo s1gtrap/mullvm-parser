@@ -350,6 +350,7 @@ atomicrmw_op      = {
   | "udec_wrap"
 }
 stmt_atomicrmw    = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)* }
+stmt_fence        = { "fence" ~ ordering ~ ("," ~ named_meta)* }
 stmt_rhs          = {
     stmt_bop
   | stmt_alloca
@@ -368,6 +369,7 @@ stmt_rhs          = {
   | stmt_inttoptr
   | stmt_phi
   | stmt_atomicrmw
+  | stmt_fence
 }
 
 stmt = {
