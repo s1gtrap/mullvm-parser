@@ -505,6 +505,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for AddrAttr {
 pub enum ConstExpr {
     Gep(bool, Type, Vec<ConstVal>),
     Inttoptr(ConstVal, Type),
+    Bitcast(ConstVal, Type),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
@@ -531,6 +532,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
                 let val = inner.next().unwrap().try_into()?;
                 let ty = inner.next().unwrap().try_into()?;
                 Ok(ConstExpr::Inttoptr(val, ty))
+            }
+            Rule::const_bitcast => {
+                let mut inner = pair.into_inner();
+                let val = inner.next().unwrap().try_into()?;
+                let ty = inner.next().unwrap().try_into()?;
+                Ok(ConstExpr::Bitcast(val, ty))
             }
             _ => unreachable!(),
         }
@@ -1219,6 +1226,26 @@ fn test_parse_stmt_rhs() {
             ordering: Ordering::Acquire,
         }),
     );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                r#"store %String* bitcast ({ i32, i32, i32, [6 x i8] }* @"'Float'" to %String*), %String** %12"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Store(Store {
+            volatile: false,
+            ty: Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))),
+            val: Val::ConstExpr(ConstExpr::Bitcast(ConstVal::Gid(Gid(r#""'Float'""#.to_owned())), Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
+            pty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
+            pval: Val::Uid(Uid("12".to_owned())),
+            align: None,
+        }),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -1359,6 +1386,29 @@ fn test_parse_stmt() {
                 tty: Type::Ptr(Box::new(Type::Uid(Uid(
                     r#""(Float64 | Int32 | String)""#.to_owned(),
                 )))),
+            }),
+        ),
+    );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                r#"store %String* bitcast ({ i32, i32, i32, [6 x i8] }* @"'Float'" to %String*), %String** %12"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            None,
+            StmtRhs::Store(Store {
+                volatile: false,
+                ty: Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))),
+                val: Val::ConstExpr(ConstExpr::Bitcast(ConstVal::Gid(Gid(r#""'Float'""#.to_owned())), Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
+                pty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
+                pval: Val::Uid(Uid("12".to_owned())),
+                align: None,
             }),
         ),
     );

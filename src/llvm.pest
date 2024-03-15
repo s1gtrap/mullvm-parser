@@ -210,7 +210,8 @@ bop = {
 
 const_gep      = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
 const_inttoptr = { "inttoptr" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
-const_expr     = { const_gep | const_inttoptr }
+const_bitcast  = { "bitcast" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
+const_expr     = { const_gep | const_inttoptr | const_bitcast }
 
 val_poison = { "poison" }
 val_undef  = { "undef" }
