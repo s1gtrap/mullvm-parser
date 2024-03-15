@@ -1114,6 +1114,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Gep {
         let pty = Type::try_from(inner.next().unwrap()).unwrap();
         let pval = Val::try_from(inner.next().unwrap()).unwrap();
         let indices = inner
+            .take_while(|p| p.as_rule() == Rule::stmt_gep_leg)
             .map(|pair| {
                 println!("{pair:?}");
                 let mut inner = pair.into_inner();
