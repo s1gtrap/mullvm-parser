@@ -211,7 +211,8 @@ bop = {
 const_gep      = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
 const_inttoptr = { "inttoptr" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
 const_bitcast  = { "bitcast" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
-const_expr     = { const_gep | const_inttoptr | const_bitcast }
+const_ptrtoint = { "ptrtoint" ~ "(" ~ const_val ~ "to" ~ ty ~ ")" }
+const_expr     = { const_gep | const_inttoptr | const_bitcast | const_ptrtoint }
 
 val_poison = { "poison" }
 val_undef  = { "undef" }
@@ -249,7 +250,7 @@ fast_math_flags = {
 inalloca = { "inalloca" }
 volatile = { "volatile" }
 
-param          = { (param_metadata ~ metadata_val) | (param_metadata? ~ param_ty ~ param_attr* ~ val) }
+param          = { (param_metadata ~ metadata_val) | (param_metadata? ~ ty ~ param_attrs ~ val) }
 param_metadata = { "metadata" }
 param_ty       = { param_metadata? ~ ty }
 params         = { (param ~ ("," ~ param)*)? }
@@ -415,8 +416,8 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
-const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_struct | const_packed | const_null | gid | int) ~ !"=")? }
-const_val     =  { ty ~ (const_zinit | const_undef | const_str | const_struct | const_packed | const_null | gid | int) }
+const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_struct | const_packed | const_null | const_expr | gid | int) ~ !"=")? }
+const_val     =  { ty ~ (const_zinit | const_undef | const_str | const_struct | const_packed | const_null | const_expr | gid | int) }
 const_zinit   =  { "zeroinitializer" }
 const_undef   =  { "undef" }
 const_str     = @{ "c" ~ string }

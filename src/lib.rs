@@ -503,8 +503,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for AddrAttr {
 
 #[derive(Debug, PartialEq)]
 pub enum ConstExpr {
-    Gep(bool, Type, Vec<ConstVal>),
+    Gep(bool, Type, ConstVal, Vec<ConstVal>),
     Inttoptr(ConstVal, Type),
+    Ptrtoint(ConstVal, Type),
     Bitcast(ConstVal, Type),
 }
 
@@ -524,8 +525,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
                     false
                 };
                 let ty = inner.next().unwrap().try_into()?;
+                let val = inner.next().unwrap().try_into()?;
                 let indices = inner.map(|p| p.try_into()).collect::<Result<_, _>>()?;
-                Ok(ConstExpr::Gep(inbounds, ty, indices))
+                Ok(ConstExpr::Gep(inbounds, ty, val, indices))
             }
             Rule::const_inttoptr => {
                 let mut inner = pair.into_inner();
@@ -538,6 +540,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
                 let val = inner.next().unwrap().try_into()?;
                 let ty = inner.next().unwrap().try_into()?;
                 Ok(ConstExpr::Bitcast(val, ty))
+            }
+            Rule::const_ptrtoint => {
+                let mut inner = pair.into_inner();
+                let val = inner.next().unwrap().try_into()?;
+                let ty = inner.next().unwrap().try_into()?;
+                Ok(ConstExpr::Ptrtoint(val, ty))
             }
             _ => unreachable!(),
         }
@@ -589,6 +597,31 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
             p => unreachable!("{:?}", p),
         }
     }
+}
+
+#[test]
+fn test_parse_val() {
+    assert_eq!(
+        Val::try_from(
+            LLVMParser::parse(
+                Rule::val,
+                "ptrtoint (%Example* getelementptr (%Example, %Example* null, i32 1) to i32)",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Val::ConstExpr(ConstExpr::Ptrtoint(
+            ConstVal::ConstExpr(Box::new(ConstExpr::Gep(
+                false,
+                Type::Uid(Uid("Example".to_owned())),
+                ConstVal::Null,
+                vec![(ConstVal::Int(1))],
+            ))),
+            Type::Id("i32".to_owned()),
+        )),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -823,6 +856,39 @@ pub enum Cconv {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Param {
+    Param(Type, Vec<ParamAttr>, Val),
+    Metadata,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Param {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let pair = inner.next().unwrap();
+        match pair.as_rule() {
+            Rule::ty => {
+                let ty = pair.try_into()?;
+                let param_attrs = match inner.peek() {
+                    Some(pair) if pair.as_rule() == Rule::param_attrs => inner
+                        .next()
+                        .unwrap()
+                        .into_inner()
+                        .map(|pair| pair.try_into())
+                        .collect::<Result<_, _>>()?,
+                    _ => vec![],
+                };
+                let val = inner.next().unwrap().try_into()?;
+                Ok(Param::Param(ty, param_attrs, val))
+            }
+            Rule::param_metadata => Ok(Param::Metadata),
+            p => unreachable!("{p:?}"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Call {
     tail: Option<Tail>,
     fast_math_flags: Option<FastMathFlags>,
@@ -831,7 +897,7 @@ pub struct Call {
     addrspace: Option<AddrSpace>,
     ty: Type,
     val: Val,
-    args: Vec<(Type, Val)>,
+    args: Vec<Param>,
     fn_attrs: Vec<FuncAttr>,
     // [ operand bundles ] // TODO: impl
 }
@@ -862,6 +928,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
         };
         let ty = inner.next().unwrap().try_into()?;
         let val = inner.next().unwrap().try_into()?;
+        let args = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .map(|pair| pair.try_into())
+            .collect::<Result<_, _>>()?;
         Ok(Call {
             tail,
             fast_math_flags,
@@ -870,9 +942,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
             addrspace: None, // TODO: impl
             ty,
             val,
-            args: vec![], // TODO: impl
+            args,
             fn_attrs: vec![], // TODO: impl
-                          // [ operand bundles ] // TODO: impl
+                              // [ operand bundles ] // TODO: impl
         })
     }
 }
@@ -1043,6 +1115,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Gep {
         let pval = Val::try_from(inner.next().unwrap()).unwrap();
         let indices = inner
             .map(|pair| {
+                println!("{pair:?}");
                 let mut inner = pair.into_inner();
                 let inrange = if inner.peek().unwrap().as_rule() == Rule::inrange {
                     inner.next().unwrap();
@@ -1312,7 +1385,7 @@ fn test_parse_stmt() {
                 addrspace: None,
                 ty: Type::Id("void".to_owned()),
                 val: Val::Gid(Gid("llvm.dbg.declare".to_owned())),
-                args: vec![],
+                args: vec![Param::Metadata, Param::Metadata, Param::Metadata],
                 fn_attrs: vec![],
                 // [ operand bundles ] // TODO: impl
             }),
@@ -1409,6 +1482,44 @@ fn test_parse_stmt() {
                 pty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
                 pval: Val::Uid(Uid("12".to_owned())),
                 align: None,
+            }),
+        ),
+    );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                "%malloccall = tail call i8* @malloc(i32 ptrtoint (%Example* getelementptr (%Example, %Example* null, i32 1) to i32))",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("malloccall".to_owned())),
+            StmtRhs::Call(Call {
+                tail: Some(Tail::Tail),
+                fast_math_flags: None,
+                cconv: None,
+                ret_attrs: vec![],
+                addrspace: None,
+                ty: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                val: Val::Gid(Gid("malloc".to_owned())),
+                args: vec![Param::Param(Type::Id("i32".to_owned()), vec![], 
+
+        Val::ConstExpr(ConstExpr::Ptrtoint(
+            ConstVal::ConstExpr(Box::new(ConstExpr::Gep(
+                false,
+                Type::Uid(Uid("Example".to_owned())),
+                ConstVal::Null,
+                vec![(ConstVal::Int(1))],
+            ))),
+            Type::Id("i32".to_owned()),
+        )),
+                )],
+                fn_attrs: vec![],
+                // [ operand bundles ] // TODO: impl
             }),
         ),
     );
@@ -1848,6 +1959,7 @@ pub enum ConstVal {
     Zinit,
     Undef,
     Null,
+    ConstExpr(Box<ConstExpr>),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
@@ -1872,6 +1984,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
             Rule::const_zinit => Ok(ConstVal::Zinit),
             Rule::const_undef => Ok(ConstVal::Undef),
             Rule::const_null => Ok(ConstVal::Null),
+            Rule::const_expr => Ok(ConstVal::ConstExpr(Box::new(pair.try_into()?))),
             // TODO: nested structs and packed probably.
             p => unreachable!("{p:?}"),
         }
