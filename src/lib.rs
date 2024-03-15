@@ -1059,6 +1059,25 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Gep {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Bitcast {
+    fty: Type,
+    val: Val,
+    tty: Type,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Bitcast {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let fty = Type::try_from(inner.next().unwrap()).unwrap();
+        let val = Val::try_from(inner.next().unwrap()).unwrap();
+        let tty = Type::try_from(inner.next().unwrap()).unwrap();
+        Ok(Bitcast { fty, val, tty })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
     Binop {
         bop: Binop,
@@ -1073,6 +1092,7 @@ pub enum StmtRhs {
     Atomicrmw(Atomicrmw),
     Fence(Fence),
     Gep(Gep),
+    Bitcast(Bitcast),
     Todo(String),
 }
 
@@ -1090,6 +1110,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_atomicrmw => Ok(StmtRhs::Atomicrmw(Atomicrmw::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
             Rule::stmt_gep => Ok(StmtRhs::Gep(Gep::try_from(pair)?)),
+            Rule::stmt_bitcast => Ok(StmtRhs::Bitcast(Bitcast::try_from(pair)?)),
             Rule::stmt_bop
             | Rule::stmt_ptrtoint
             | Rule::stmt_icmp
@@ -1296,7 +1317,7 @@ fn test_parse_stmt() {
         Stmt::try_from(
             LLVMParser::parse(
                 Rule::stmt,
-                r#"%3 = getelementptr inbounds %Example, %Example* %2, i32 0, i32 1"#
+                r#"%3 = getelementptr inbounds %Example, %Example* %2, i32 0, i32 1"#,
             )
             .unwrap()
             .next()
@@ -1314,6 +1335,30 @@ fn test_parse_stmt() {
                     (false, Type::Id("i32".to_owned()), Val::Int(0)),
                     (false, Type::Id("i32".to_owned()), Val::Int(1)),
                 ],
+            }),
+        ),
+    );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                "%9 = bitcast %\"(Float64 | Int32)\"* %8 to %\"(Float64 | Int32 | String)\"*",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("9".to_owned())),
+            StmtRhs::Bitcast(Bitcast {
+                fty: Type::Ptr(Box::new(Type::Uid(
+                    Uid(r#""(Float64 | Int32)""#.to_owned()),
+                ))),
+                val: Val::Uid(Uid("8".to_owned())),
+                tty: Type::Ptr(Box::new(Type::Uid(Uid(
+                    r#""(Float64 | Int32 | String)""#.to_owned(),
+                )))),
             }),
         ),
     );
