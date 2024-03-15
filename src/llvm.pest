@@ -278,7 +278,7 @@ stmt_gep          = {
     "getelementptr" ~ inbounds? ~ ty ~ "," ~ ty ~ val ~ stmt_gep_leg* ~ ("," ~ metadata_name ~ metadata_num)*
 }
 stmt_load         = {
-    "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align ~ ("," ~ metadata_name ~ metadata_num)*
+    "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
 stmt_ptrtoint     = {
     "ptrtoint" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ metadata_name ~ metadata_num)*
@@ -378,7 +378,7 @@ stmt = {
 
 term_ret         = { "ret" ~ ty ~ val? ~ ("," ~ metadata_name ~ metadata_num)* }
 term_br          = { "br" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
-term_cbr         = { "br" ~ "i1" ~ val ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
+term_cbr         = { "br" ~ "i1" ~ uid ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
 term_unreachable = { "unreachable" ~ ("," ~ metadata_name ~ metadata_num)* }
 term_invoke      = {
     (uid ~ "=")? ~ "invoke" ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ "to" ~ "label" ~ uid ~ "unwind" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)*

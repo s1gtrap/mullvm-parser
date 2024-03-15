@@ -713,6 +713,7 @@ pub struct Load {
     pval: Val,
     align: Option<usize>,
 }
+
 impl<'i> TryFrom<Pair<'i, Rule>> for Load {
     type Error = pest::error::Error<Rule>;
 
@@ -1349,15 +1350,39 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Term {
                     .transpose()?;
                 Ok(Term::Ret(ty, val))
             }
+            Rule::term_cbr => {
+                let mut inner = pair.into_inner();
+                let cnd = Uid::try_from(inner.next().unwrap())?;
+                let thn = Uid::try_from(inner.next().unwrap())?;
+                let els = Uid::try_from(inner.next().unwrap())?;
+                Ok(Term::Cbr(cnd, thn, els))
+            }
             Rule::term_br
-            | Rule::term_cbr
             | Rule::term_unreachable
             | Rule::term_invoke
             | Rule::term_resume
             | Rule::term_switch => Ok(Term::Todo(pair.as_str().to_owned())),
-            _ => unreachable!(),
+            p => unreachable!("{p:?}"),
         }
     }
+}
+#[test]
+fn test_parse_term() {
+    use pest::Parser;
+    assert_eq!(
+        Term::try_from(
+            LLVMParser::parse(Rule::term, "br i1 %6, label %then, label %else",)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Term::Cbr(
+            Uid("6".to_owned()),
+            Uid("then".to_owned()),
+            Uid("else".to_owned()),
+        ),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -1429,6 +1454,55 @@ fn test_parse_block() {
             label: Some(String::from("0")),
             insns: vec![],
             term: Term::Ret(Type::Id("void".to_owned()), None),
+        },
+    );
+    assert_eq!(
+        Block::try_from(
+            LLVMParser::parse(
+                Rule::block,
+                r#"  %2 = load %Example*, %Example** %a
+  %3 = getelementptr inbounds %Example, %Example* %2, i32 0, i32 1
+  br i1 %6, label %then, label %else"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Block {
+            label: None,
+            insns: vec![
+                Stmt(
+                    Some(Uid("2".to_string())),
+                    StmtRhs::Load(Load {
+                        volatile: false,
+                        ty: Type::Ptr(Box::new(Type::Uid(Uid("Example".to_owned())))),
+                        pty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Uid(Uid(
+                            "Example".to_owned(),
+                        )))))),
+                        pval: Val::Uid(Uid("a".to_owned())),
+                        align: None,
+                    }),
+                ),
+                Stmt(
+                    Some(Uid("3".to_string())),
+                    StmtRhs::Gep(Gep {
+                        inbounds: true,
+                        ty: Type::Uid(Uid("Example".to_owned())),
+                        pty: Type::Ptr(Box::new(Type::Uid(Uid("Example".to_owned())))),
+                        pval: Val::Uid(Uid("2".to_owned())),
+                        indices: vec![
+                            (false, Type::Id("i32".to_owned()), Val::Int(0)),
+                            (false, Type::Id("i32".to_owned()), Val::Int(1)),
+                        ],
+                    }),
+                ),
+            ],
+            term: Term::Cbr(
+                Uid("6".to_owned()),
+                Uid("then".to_owned()),
+                Uid("else".to_owned()),
+            ),
         }
     );
 }
