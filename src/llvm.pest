@@ -195,6 +195,8 @@ func_attr = {
   | ("\"target-cpu\"" ~ "=" ~ string)
   | ("\"target-features\"" ~ "=" ~ string)
   | ("\"tune-cpu\"" ~ "=" ~ string)
+  | ("\"no-frame-pointer-elim\"" ~ "=" ~ string)
+  | ("\"no-frame-pointer-elim-non-leaf\"" ~ "=" ~ string)
 }
 
 attr_group = @{ "#" ~ uint }
@@ -458,7 +460,7 @@ metadata                    =  { metadata_name ~ "=" ~ metadata_node }
 source_filename   = { "source_filename" ~ "=" ~ string }
 target_datalayout = { "target" ~ "datalayout" ~ "=" ~ string }
 target_triple     = { "target" ~ "triple" ~ "=" ~ string }
-attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ func_attr* ~ "}" }
+attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ (func_attr | id)* ~ "}" }
 
 declarg  = { ty ~ param_attrs }
 declargs = { (declarg ~ ("," ~ declarg)*)? }

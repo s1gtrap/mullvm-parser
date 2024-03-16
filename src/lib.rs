@@ -2063,7 +2063,10 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             Some(val) if val.as_rule() == Rule::const_zinit => Some(ConstVal::Zinit),
             Some(val) if val.as_rule() == Rule::const_undef => Some(ConstVal::Undef),
             Some(val) if val.as_rule() == Rule::const_null => Some(ConstVal::Null),
-            Some(_) => todo!(),
+            Some(val) if val.as_rule() == Rule::int => {
+                Some(ConstVal::Int(val.as_str().parse().unwrap()))
+            }
+            Some(p) => todo!("{p:?}"),
             None => None,
         };
         let align = match inner.peek() {
@@ -2652,5 +2655,15 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
                 ConstVal::Int(1), ConstVal::Int(5), ConstVal::Int(5), ConstVal::String("Float\\00".to_owned()),
             ])),
         }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition,"attributes #0 = { uwtable \"no-frame-pointer-elim\"=\"true\" \"no-frame-pointer-elim-non-leaf\"=\"true\" }")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::Attributes,
     );
 }
