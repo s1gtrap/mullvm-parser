@@ -843,6 +843,53 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Load {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct LoadAtomic {
+    volatile: bool,
+    ty: Type,
+    pty: Type,
+    pval: Val,
+    // [syncscope("<target-scope>")]
+    ordering: Ordering,
+    align: usize,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for LoadAtomic {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let volatile = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::volatile => {
+                inner.next().unwrap();
+                true
+            }
+            _ => false,
+        };
+        let ty = Type::try_from(inner.next().unwrap())?;
+        let pty = Type::try_from(inner.next().unwrap())?;
+        let pval = Val::try_from(inner.next().unwrap())?;
+        let ordering = Ordering::try_from(inner.next().unwrap())?;
+        let align = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .next()
+            .unwrap()
+            .as_str()
+            .parse()
+            .unwrap();
+        Ok(LoadAtomic {
+            volatile,
+            ty,
+            pty,
+            pval,
+            ordering,
+            align,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Tail {
     Tail,
     Musttail,
@@ -1227,6 +1274,7 @@ pub enum StmtRhs {
     Store(Store),
     Call(Call),
     Load(Load),
+    LoadAtomic(LoadAtomic),
     Atomicrmw(Atomicrmw),
     Fence(Fence),
     Gep(Gep),
@@ -1244,6 +1292,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
             Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
+            Rule::stmt_load_atomic => Ok(StmtRhs::LoadAtomic(LoadAtomic::try_from(pair)?)),
             Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
             Rule::stmt_atomicrmw => Ok(StmtRhs::Atomicrmw(Atomicrmw::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
@@ -1402,6 +1451,26 @@ fn test_parse_stmt_rhs() {
             ))),
             pval: Val::Uid(Uid("1".to_owned())),
             align: None,
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "load atomic i64, ptr %dst monotonic, align 8, !dbg !2324",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::LoadAtomic(LoadAtomic {
+            volatile: false,
+            ty: Type::Id("i64".to_owned()),
+            pty: Type::Id("ptr".to_owned()),
+            pval: Val::Uid(Uid("dst".to_owned())),
+            ordering: Ordering::Monotonic,
+            align: 8,
         }),
     );
 }

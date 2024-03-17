@@ -292,6 +292,9 @@ stmt_gep_leg        = { "," ~ inrange? ~ ty ~ val }
 stmt_gep            = {
     "getelementptr" ~ inbounds? ~ ty ~ "," ~ ty ~ val ~ stmt_gep_leg* ~ ("," ~ named_meta)*
 }
+stmt_load_atomic    = {
+    "load" ~ "atomic" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)*
+}
 stmt_load           = {
     "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
@@ -387,6 +390,7 @@ stmt_rhs            = {
   | stmt_store
   | stmt_call
   | stmt_gep
+  | stmt_load_atomic
   | stmt_load
   | stmt_ptrtoint
   | stmt_icmp
