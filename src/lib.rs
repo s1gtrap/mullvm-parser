@@ -563,6 +563,7 @@ pub enum Val {
     Poison,
     Undef,
     Null,
+    Zinit,
     Struct(Vec<Val>),
     ConstExpr(ConstExpr),
 }
@@ -592,6 +593,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                     Rule::val_poison => Ok(Val::Poison),
                     Rule::val_undef => Ok(Val::Undef),
                     Rule::val_null => Ok(Val::Null),
+                    Rule::val_zinit => Ok(Val::Zinit),
                     Rule::val_struct => Ok(Val::Struct(
                         pair.into_inner()
                             .skip(1)
@@ -1056,8 +1058,8 @@ pub enum Ordering {
     Monotonic,
     Acquire,
     Release,
-    // AcqRel(acquire+release) // TODO: impl
-    // SeqCst(sequentially consistent) // TODO: impl
+    AcqRel,
+    SeqCst,
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Ordering {
@@ -1069,6 +1071,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Ordering {
             "monotonic" => Ordering::Monotonic,
             "acquire" => Ordering::Acquire,
             "release" => Ordering::Release,
+            "acq_rel" => Ordering::AcqRel,
+            "seq_cst" => Ordering::SeqCst,
             _ => unreachable!(),
         })
     }
@@ -1374,6 +1378,29 @@ fn test_parse_stmt_rhs() {
             val: Val::ConstExpr(ConstExpr::Bitcast(ConstVal::Gid(Gid(r#""'Float'""#.to_owned())), Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
             pty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
             pval: Val::Uid(Uid("12".to_owned())),
+            align: None,
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "store [1 x i64] zeroinitializer, [1 x i64]* %1",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Store(Store {
+            volatile: false,
+            ty: Type::Array(1, Box::new(Type::Id("i64".to_owned()))),
+            val: Val::Zinit,
+            pty: Type::Ptr(Box::new(Type::Array(
+                1,
+                Box::new(Type::Id("i64".to_owned())),
+            ))),
+            pval: Val::Uid(Uid("1".to_owned())),
             align: None,
         }),
     );
