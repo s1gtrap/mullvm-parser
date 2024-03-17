@@ -384,6 +384,8 @@ stmt_shufflevector  = {
 stmt_sitofp         = {
     "sitofp" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
+weak                = { "weak" }
+stmt_cmpxchg        = { "cmpxchg" ~ weak? ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ordering ~ ordering ~ align? ~ ("," ~ named_meta)* }
 stmt_rhs            = {
     stmt_bop
   | stmt_alloca
@@ -409,6 +411,7 @@ stmt_rhs            = {
   | stmt_extractelement
   | stmt_shufflevector
   | stmt_sitofp
+  | stmt_cmpxchg
 }
 
 stmt = {
