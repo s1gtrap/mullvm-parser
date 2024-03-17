@@ -555,6 +555,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
 #[derive(Debug, PartialEq)]
 pub enum Val {
     Int(i128),
+    Float(f64),
     Uid(Uid),
     Gid(Gid),
     True,
@@ -575,6 +576,14 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                 let mut inner = pair.into_inner();
                 let pair = inner.next().unwrap();
                 match pair.as_rule() {
+                    Rule::float => {
+                        println!("{pair:?}");
+                        let mut inner = pair.into_inner();
+                        let base: f64 = inner.next().unwrap().as_str().parse().unwrap();
+                        let exp =
+                            10.0_f64.powi(inner.next().unwrap().as_str()[1..].parse().unwrap());
+                        Ok(Val::Float(base * exp))
+                    }
                     Rule::int => Ok(Val::Int(pair.as_str().parse().unwrap())),
                     Rule::uid => Ok(Val::Uid(pair.try_into()?)),
                     Rule::gid => Ok(Val::Gid(pair.try_into()?)),
@@ -622,6 +631,49 @@ fn test_parse_val() {
             Type::Id("i32".to_owned()),
         )),
     );
+    assert_eq!(
+        Val::try_from(
+            LLVMParser::parse(Rule::val, "2.000000e+00")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Val::Float(2.0f64),
+    );
+    // assert_eq!(
+    //     // FIXME: parses as inf
+    //     Val::try_from(
+    //         LLVMParser::parse(Rule::val, "1.7976931348623157e+308")
+    //             .unwrap()
+    //             .next()
+    //             .unwrap(),
+    //     )
+    //     .unwrap(),
+    //     Val::Float(f64::MAX),
+    // );
+    // assert_eq!(
+    //     // FIXME: not accurate
+    //     Val::try_from(
+    //         LLVMParser::parse(Rule::val, "2.2250738585072014e-308f64")
+    //             .unwrap()
+    //             .next()
+    //             .unwrap(),
+    //     )
+    //     .unwrap(),
+    //     Val::Float(f64::MIN_POSITIVE),
+    // );
+    // assert_eq!(
+    //     // FIXME: parses as -inf
+    //     Val::try_from(
+    //         LLVMParser::parse(Rule::val, "-1.7976931348623157e+308f64")
+    //             .unwrap()
+    //             .next()
+    //             .unwrap(),
+    //     )
+    //     .unwrap(),
+    //     Val::Float(f64::MIN),
+    // );
 }
 
 #[derive(Debug, PartialEq)]
@@ -630,6 +682,7 @@ pub enum Bop1 {
     Srem,
     And,
     Xor,
+    Fdiv, // TODO: impl fast-math flags
 }
 
 #[derive(Debug, PartialEq)]
@@ -1205,6 +1258,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             | Rule::stmt_sext
             | Rule::stmt_extractelement
             | Rule::stmt_shufflevector
+            | Rule::stmt_sitofp
             | Rule::stmt_phi => Ok(StmtRhs::Todo(pair.as_str().to_owned())),
             p => unreachable!("{:?}", p),
         }
@@ -1511,22 +1565,39 @@ fn test_parse_stmt() {
                 ty: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
                 val: Val::Gid(Gid("malloc".to_owned())),
                 args: vec![Param::Param(Type::Id("i32".to_owned()), vec![], 
-
-        Val::ConstExpr(ConstExpr::Ptrtoint(
-            ConstVal::ConstExpr(Box::new(ConstExpr::Gep(
-                false,
-                Type::Uid(Uid("Example".to_owned())),
-                ConstVal::Null,
-                vec![(ConstVal::Int(1))],
-            ))),
-            Type::Id("i32".to_owned()),
-        )),
+                    Val::ConstExpr(ConstExpr::Ptrtoint(
+                        ConstVal::ConstExpr(Box::new(ConstExpr::Gep(
+                            false,
+                            Type::Uid(Uid("Example".to_owned())),
+                            ConstVal::Null,
+                            vec![(ConstVal::Int(1))],
+                        ))),
+                        Type::Id("i32".to_owned()),
+                    )),
                 )],
                 fn_attrs: vec![],
                 // [ operand bundles ] // TODO: impl
             }),
         ),
     );
+    /*assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(Rule::stmt, "%21 = fdiv double %20, 2.000000e+00")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("21".to_owned())),
+            StmtRhs::Binop {
+                bop: Binop::Bop1(Bop1::Fdiv),
+                ty: Type::Id("double".to_owned()),
+                op1: Val::Uid(Uid("20".to_owned())),
+                op2: Val::Float(2.0f64),
+            },
+        ),
+    );*/
 }
 
 #[derive(Debug, PartialEq)]
