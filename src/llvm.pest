@@ -222,6 +222,7 @@ val_null   = { "null" }
 val_true   = { "true" }
 val_false  = { "false" }
 val_struct = { "{" ~ (ty ~ val ~ ("," ~ ty ~ val)*)? ~ "}" }
+val_vector = { "<" ~ (ty ~ val ~ ("," ~ ty ~ val)*)? ~ ">" }
 val        = {
     int
   | uid
@@ -232,6 +233,7 @@ val        = {
   | val_undef
   | val_null
   | val_struct
+  | val_vector
   | const_expr
 }
 
@@ -264,30 +266,33 @@ ordering = {
   | "release"
 }
 
-stmt_bop          = { bop ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)* }
-stmt_alloca       = {
+stmt_bop            = { bop ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)* }
+stmt_alloca         = {
     "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)? ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_store        = {
+stmt_store          = {
     // TODO: !nontemporal, !invariant.group
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_call         = {
+stmt_call           = {
     tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attrs ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
-inbounds          = { "inbounds" }
-inrange           = { "inrange" }
-stmt_gep_leg      = { "," ~ inrange? ~ ty ~ val }
-stmt_gep          = {
+inbounds            = { "inbounds" }
+inrange             = { "inrange" }
+stmt_gep_leg        = { "," ~ inrange? ~ ty ~ val }
+stmt_gep            = {
     "getelementptr" ~ inbounds? ~ ty ~ "," ~ ty ~ val ~ stmt_gep_leg* ~ ("," ~ named_meta)*
 }
-stmt_load         = {
+stmt_load           = {
     "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_ptrtoint     = {
+stmt_ptrtoint       = {
     "ptrtoint" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ metadata_name ~ metadata_num)*
 }
-cond              = {
+stmt_sext           = {
+    "sext" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
+cond                = {
     "eq"
   | "ne"
   | "ugt"
@@ -299,42 +304,42 @@ cond              = {
   | "slt"
   | "sle"
 }
-stmt_icmp         = {
+stmt_icmp           = {
     "icmp" ~ cond ~ ty ~ val ~ "," ~ val ~ ("," ~ metadata_name ~ metadata_num)*
 }
-selty             = {
+selty               = {
     "i1"
   | ("<" ~ uint ~ "x" ~ "i1" ~ ">")
 }
-stmt_select       = {
+stmt_select         = {
     "select" ~ fast_math_flags? ~ selty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ metadata_name ~ metadata_num)*
 }
-stmt_insertvalue  = {
+stmt_insertvalue    = {
     "insertvalue" ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ val ~ ("," ~ val)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
-resultty          = { ty }
-cleanup           = { "cleanup" }
-clause            = { clause_catch | clause_filter }
-clause_catch      = { "catch" ~ const_val }
-clause_filter     = { "filter" ~ const_val }
-stmt_landingpad   = {
+resultty            = { ty }
+cleanup             = { "cleanup" }
+clause              = { clause_catch | clause_filter }
+clause_catch        = { "catch" ~ const_val }
+clause_filter       = { "filter" ~ const_val }
+stmt_landingpad     = {
     "landingpad" ~ resultty ~ (clause+ | (cleanup ~ clause*))
 }
-stmt_extractvalue = {
+stmt_extractvalue   = {
     "extractvalue" ~ ty ~ val ~ "," ~ val ~ ("," ~ val)* ~ ("," ~ named_meta)*
 }
-stmt_trunc        = {
+stmt_trunc          = {
     "trunc" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
-stmt_zext         = {
+stmt_zext           = {
     "zext" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
-stmt_inttoptr     = {
+stmt_inttoptr       = {
     "inttoptr" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
-stmt_phi_leg      = { "[" ~ val ~ "," ~ uid ~ "]" }
-stmt_phi          = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* ~ ("," ~ named_meta)* }
-atomicrmw_op      = {
+stmt_phi_leg        = { "[" ~ val ~ "," ~ uid ~ "]" }
+stmt_phi            = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* ~ ("," ~ named_meta)* }
+atomicrmw_op        = {
     "xchg"
   | "add"
   | "sub"
@@ -353,12 +358,18 @@ atomicrmw_op      = {
   | "uinc_wrap"
   | "udec_wrap"
 }
-stmt_atomicrmw    = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)* }
-stmt_fence        = { "fence" ~ ordering ~ ("," ~ named_meta)* }
-stmt_bitcast      = {
+stmt_atomicrmw      = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)* }
+stmt_fence          = { "fence" ~ ordering ~ ("," ~ named_meta)* }
+stmt_bitcast        = {
     "bitcast" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
-stmt_rhs          = {
+stmt_extractelement = {
+    "extractelement" ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ named_meta)*
+}
+stmt_shufflevector  = {
+    "shufflevector" ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ named_meta)*
+}
+stmt_rhs            = {
     stmt_bop
   | stmt_alloca
   | stmt_store
@@ -378,6 +389,9 @@ stmt_rhs          = {
   | stmt_atomicrmw
   | stmt_fence
   | stmt_bitcast
+  | stmt_sext
+  | stmt_extractelement
+  | stmt_shufflevector
 }
 
 stmt = {
