@@ -1901,7 +1901,7 @@ pub struct Function {
     ret_attrs: Vec<ParamAttr>,
     ret: Type,
     name: Gid,
-    args: Vec<(Type, Vec<ParamAttr>, Uid)>,
+    args: Vec<(Type, Vec<ParamAttr>, Option<Uid>)>,
     addr_attr: Option<AddrAttr>,
     addr_space: Option<AddrSpace>,
     func_attrs: Vec<FuncAttr>,
@@ -1962,7 +1962,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
                         } else {
                             vec![]
                         };
-                        let id = Uid::try_from(inner.next().unwrap())?;
+                        let id = inner.next().map(Uid::try_from).transpose()?;
                         Ok((ty, attrs, id))
                     })
                     .collect::<Result<Vec<_>, _>>()
@@ -2004,7 +2004,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             ret_attrs,
             ret,
             name,
-            args,               // TODO: impl
+            args,
             addr_attr,          // TODO: impl
             addr_space,         // TODO: impl
             func_attrs: vec![], // TODO: impl
@@ -2050,6 +2050,48 @@ fn test_parse_function() {
                 label: None,
                 insns: vec![],
                 term: Term::Ret(Type::Id("i8".to_owned()), Some(Val::Int(0))),
+            }]
+        }
+    );
+    assert_eq!(
+        Function::try_from(
+            LLVMParser::parse(
+                Rule::function,
+                r#"define void @set_date(%struct.Date*, i32, i32, i32) #0 {
+  ret void
+}"# // FIXME: test attribute
+            )
+            .unwrap()
+            .next()
+            .unwrap()
+        )
+        .unwrap(),
+        Function {
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("void".to_owned()),
+            name: Gid("set_date".to_owned()),
+            args: vec![
+                (
+                    Type::Ptr(Box::new(Type::Uid(Uid("struct.Date".to_owned())))),
+                    vec![],
+                    None,
+                ),
+                (Type::Id("i32".to_owned()), vec![], None),
+                (Type::Id("i32".to_owned()), vec![], None),
+                (Type::Id("i32".to_owned()), vec![], None),
+            ],
+            addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            blocks: vec![Block {
+                label: None,
+                insns: vec![],
+                term: Term::Ret(Type::Id("void".to_owned()), None),
             }]
         }
     );

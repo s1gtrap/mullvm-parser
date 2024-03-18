@@ -100,7 +100,7 @@ param_attr  = {
 }
 param_attrs = { param_attr* }
 
-argument  = { ty ~ param_attrs ~ uid }
+argument  = { ty ~ param_attrs ~ uid? }
 arguments = { (argument ~ ("," ~ argument)*)? }
 
 addr_attr = { "unnamed_addr" | "local_unnamed_addr" }
