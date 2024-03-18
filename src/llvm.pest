@@ -120,6 +120,9 @@ func_attr_memory_field = {
     (func_attr_memory_key ~ ":")? ~ func_attr_memory_value
 }
 
+// func_attr = {
+// (id | string) ~ (("(" ~ (uint | string) ~ ("," ~ (uint | string))* ~ ")") | "=" ~ string)?
+// }
 func_attr = {
     ("alignstack" ~ "(" ~ uint ~ ")")
   | ("\"alloc-family\"" ~ "=" ~ string)
@@ -501,7 +504,7 @@ target_triple     = { "target" ~ "triple" ~ "=" ~ string }
 attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ (func_attr | id)* ~ "}" }
 
 declarg  = { ty ~ param_attrs }
-declargs = { (declarg ~ ("," ~ declarg)* ~ ("," ~ vararg))? }
+declargs = { (declarg ~ ("," ~ declarg)* ~ ("," ~ vararg)?)? }
 declare  = {
     "declare" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
 }

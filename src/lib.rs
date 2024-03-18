@@ -2612,6 +2612,35 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
     }
 }
 
+#[test]
+fn test_parse_declaration() {
+    use pest::Parser;
+    assert_eq!(
+        Declaration::try_from(
+            LLVMParser::parse(Rule::declare, "declare noalias i8* @malloc(i32)")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Declaration {
+            linkage: None,
+            vis: None,
+            cconv: None,
+            ret_attrs: vec![ParamAttr::Noalias],
+            ret: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+            name: Gid("malloc".to_owned()),
+            args: vec![(Type::Id("i32".to_owned()), vec![])],
+            addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            //| attr_group)*
+            //personality: Option<Personality>,
+            //named_meta*: ???
+        },
+    );
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Definition {
     Function(Function),
@@ -2672,6 +2701,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
         }
     }
 }
+
 #[test]
 fn test_parse_definition() {
     use pest::Parser;
