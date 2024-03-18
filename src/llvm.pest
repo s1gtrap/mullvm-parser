@@ -473,11 +473,15 @@ named_meta_name = @{ "!" ~ id }
 named_meta_num  = @{ "!" ~ uint }
 named_meta      =  { named_meta_name ~ named_meta_num }
 
+thread_local = {
+    "thread_local" ~ ("(" ~ id ~ ")")?
+}
+
 ident_type  = {
     uid ~ "=" ~ "type" ~ ty
 }
 ident_const = {
-    gid ~ "=" ~ (linkage? ~ addr_attr? ~ const_attr ~ const_val_opt ~ align? ~ ("," ~ named_meta)*)
+    gid ~ "=" ~ (linkage? ~ thread_local? ~ addr_attr? ~ const_attr ~ const_val_opt ~ align? ~ ("," ~ named_meta)*)
 }
 
 distinct = { "distinct" }

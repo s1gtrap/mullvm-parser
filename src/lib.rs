@@ -52,7 +52,7 @@ fn test_parse_module() {
                         preemp: None,
                         vis: None,
                         store: None,
-                        cconv: None,
+                        thread_local: None,
                         addr_attr: Some(AddrAttr::UnnamedAddr),
                         addr_space: None,
                         externally_initialized: None,
@@ -70,7 +70,7 @@ fn test_parse_module() {
                         preemp: None,
                         vis: None,
                         store: None,
-                        cconv: None,
+                        thread_local: None,
                         addr_attr: Some(AddrAttr::UnnamedAddr),
                         addr_space: None,
                         externally_initialized: None,
@@ -2146,7 +2146,18 @@ fn test_parse_function() {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ThreadLocal {}
+pub struct ThreadLocal(Option<String>);
+
+impl<'i> TryFrom<Pair<'i, Rule>> for ThreadLocal {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        Ok(ThreadLocal(
+            inner.next().as_ref().map(Pair::as_str).map(String::from),
+        ))
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum ExternallyInitialized {}
@@ -2259,7 +2270,7 @@ pub struct Const {
     preemp: Option<Preemp>,
     vis: Option<Visibility>,
     store: Option<DLLStorageClass>,
-    cconv: Option<ThreadLocal>,
+    thread_local: Option<ThreadLocal>,
     addr_attr: Option<AddrAttr>,
     addr_space: Option<AddrSpace>,
     externally_initialized: Option<ExternallyInitialized>,
@@ -2282,6 +2293,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
         let name: Gid = inner.next().unwrap().try_into()?;
         let linkage = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let thread_local = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::thread_local => {
                 Some(inner.next().unwrap().try_into()?)
             }
             _ => None,
@@ -2350,7 +2367,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local,
             addr_attr,
             addr_space: None,
             externally_initialized: None,
@@ -2380,7 +2397,7 @@ fn test_parse_ident_const() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: None,
             addr_space: None,
             externally_initialized: None,
@@ -2405,7 +2422,7 @@ fn test_parse_ident_const() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: None,
             addr_space: None,
             externally_initialized: None,
@@ -2430,7 +2447,7 @@ fn test_parse_ident_const() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             externally_initialized: None,
@@ -2455,7 +2472,7 @@ fn test_parse_ident_const() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             externally_initialized: None,
@@ -2481,7 +2498,7 @@ fn test_parse_ident_const() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             externally_initialized: None,
@@ -2546,30 +2563,28 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
             Some(pair) if pair.as_rule() == Rule::declargs => {
                 let inner = inner.next().unwrap().into_inner();
                 inner
-                    .filter_map(|p| {
-                        if p.as_rule() == Rule::ty {
-                            let mut inner = p.into_inner();
-                            let ty = Type::try_from(inner.next().unwrap()).ok()?;
-                            let attrs = if inner.peek().unwrap().as_rule() == Rule::param_attrs {
-                                inner
-                                    .next()
-                                    .unwrap()
-                                    .into_inner()
-                                    .map(ParamAttr::try_from)
-                                    .collect::<Result<Vec<_>, _>>()
-                                    .ok()?
-                            } else {
-                                vec![]
-                            };
-                            Some(Ok((ty, attrs)))
+                    .take_while(|p| p.as_rule() == Rule::declarg)
+                    .map(|p| {
+                        println!("{p:?}");
+                        let mut inner = p.into_inner();
+                        let ty = Type::try_from(inner.next().unwrap())?;
+                        let attrs = if inner.peek().unwrap().as_rule() == Rule::param_attrs {
+                            inner
+                                .next()
+                                .unwrap()
+                                .into_inner()
+                                .map(ParamAttr::try_from)
+                                .collect::<Result<Vec<_>, _>>()?
                         } else {
-                            None
-                        }
+                            vec![]
+                        };
+                        Ok((ty, attrs))
                     })
                     .collect::<Result<Vec<_>, _>>()
             }
             _ => unreachable!(),
         }?;
+        println!("{args:?}");
         let addr_attr = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::addr_attr => {
                 Some(inner.next().unwrap().try_into()?)
@@ -2760,7 +2775,7 @@ fn test_parse_definition() {
                 preemp: None,
                 vis: None,
                 store: None,
-                cconv: None,
+                thread_local: None,
                 addr_attr: Some(AddrAttr::UnnamedAddr),
                 addr_space: None,
                 externally_initialized: None,
@@ -2787,7 +2802,7 @@ fn test_parse_definition() {
                 preemp: None,
                 vis: None,
                 store: None,
-                cconv: None,
+                thread_local: None,
                 addr_attr: Some(AddrAttr::UnnamedAddr),
                 addr_space: None,
                 externally_initialized: None,
@@ -2817,7 +2832,7 @@ fn test_parse_definition() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: None,
             addr_space: None,
             externally_initialized: None,
@@ -2845,7 +2860,7 @@ fn test_parse_definition() {
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             externally_initialized: None,
@@ -2873,7 +2888,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             externally_initialized: None,
@@ -2913,7 +2928,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: None,
             addr_space: None,
             externally_initialized: None,
@@ -2938,7 +2953,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             preemp: None,
             vis: None,
             store: None,
-            cconv: None,
+            thread_local: None,
             addr_attr: None,
             addr_space: None,
             externally_initialized: None,
