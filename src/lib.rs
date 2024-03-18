@@ -2546,20 +2546,25 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
             Some(pair) if pair.as_rule() == Rule::declargs => {
                 let inner = inner.next().unwrap().into_inner();
                 inner
-                    .map(|p| {
-                        let mut inner = p.into_inner();
-                        let ty = Type::try_from(inner.next().unwrap())?;
-                        let attrs = if inner.peek().unwrap().as_rule() == Rule::param_attrs {
-                            inner
-                                .next()
-                                .unwrap()
-                                .into_inner()
-                                .map(ParamAttr::try_from)
-                                .collect::<Result<Vec<_>, _>>()?
+                    .filter_map(|p| {
+                        if p.as_rule() == Rule::ty {
+                            let mut inner = p.into_inner();
+                            let ty = Type::try_from(inner.next().unwrap()).ok()?;
+                            let attrs = if inner.peek().unwrap().as_rule() == Rule::param_attrs {
+                                inner
+                                    .next()
+                                    .unwrap()
+                                    .into_inner()
+                                    .map(ParamAttr::try_from)
+                                    .collect::<Result<Vec<_>, _>>()
+                                    .ok()?
+                            } else {
+                                vec![]
+                            };
+                            Some(Ok((ty, attrs)))
                         } else {
-                            vec![]
-                        };
-                        Ok((ty, attrs))
+                            None
+                        }
                     })
                     .collect::<Result<Vec<_>, _>>()
             }
