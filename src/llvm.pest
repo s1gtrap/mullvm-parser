@@ -501,7 +501,7 @@ target_triple     = { "target" ~ "triple" ~ "=" ~ string }
 attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ (func_attr | id)* ~ "}" }
 
 declarg  = { ty ~ param_attrs }
-declargs = { (declarg ~ ("," ~ declarg)*)? }
+declargs = { (declarg ~ ("," ~ declarg)* ~ ("," ~ vararg))? }
 declare  = {
     "declare" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
 }
