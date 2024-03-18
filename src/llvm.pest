@@ -10,9 +10,10 @@ float_base = @{ int ~ "." ~ ASCII_DIGIT+ }
 float_exp  = @{ "e" ~ ("+" | "-") ~ ASCII_DIGIT+ }
 float      = ${ float_base ~ float_exp? }
 
-id  = @{ (ASCII_ALPHANUMERIC | "_" | "." | "-")+ }
-uid = @{ "%" ~ (string | id) }
-gid = @{ "@" ~ (string | id) }
+idchar = @{ ASCII_ALPHANUMERIC | "_" | "." | "-" }
+id     = @{ !vararg ~ idchar+ }
+uid    = @{ "%" ~ (string | id) }
+gid    = @{ "@" ~ (string | id) }
 
 string = ${ "\"" ~ inner ~ "\"" }
 inner  = @{ char* }
@@ -56,6 +57,9 @@ cconv = {
   | "swifttailcc"
   | "cfguard_checkcc" // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64.
 }
+
+vararg = { "..." }
+fnty   = { ty ~ "(" ~ (ty ~ ("," ~ ty)* ~ ("," ~ vararg)? | vararg)? ~ ")" }
 
 star      = { "*" }
 ty        = { (id | uid | ty_array | ty_vector | ty_struct | ty_packed) ~ star* }
@@ -284,7 +288,7 @@ stmt_store          = {
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
 stmt_call           = {
-    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attrs ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
+    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attrs ~ addr_space? ~ (fnty | ty) ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
 inbounds            = { "inbounds" }
 inrange             = { "inrange" }

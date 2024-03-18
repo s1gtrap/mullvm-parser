@@ -144,45 +144,64 @@ pub enum Type {
     Vector(usize, Box<Type>),
     Struct(Vec<Type>),
     Packed(Vec<Type>),
+    Fn(Box<Type>, Vec<Type>, bool),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Type {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        assert_eq!(pair.as_rule(), Rule::ty);
-        let mut inner = pair.into_inner();
-        let pair = inner.next().unwrap();
-        let ty = match pair.as_rule() {
-            Rule::ty => Type::try_from(pair.into_inner().next().unwrap())?,
-            Rule::id => Type::Id(pair.as_str().to_owned()),
-            Rule::uid => Type::Uid(Uid::try_from(pair)?),
-            Rule::ty_array => {
+        match pair.as_rule() {
+            Rule::ty => {
                 let mut inner = pair.into_inner();
-                let elems = inner.next().unwrap().as_str().parse().unwrap();
-                let ty = Type::try_from(inner.next().unwrap())?;
-                Type::Array(elems, Box::new(ty))
+                let pair = inner.next().unwrap();
+                let ty = match pair.as_rule() {
+                    Rule::ty => Type::try_from(pair.into_inner().next().unwrap())?,
+                    Rule::id => Type::Id(pair.as_str().to_owned()),
+                    Rule::uid => Type::Uid(Uid::try_from(pair)?),
+                    Rule::ty_array => {
+                        let mut inner = pair.into_inner();
+                        let elems = inner.next().unwrap().as_str().parse().unwrap();
+                        let ty = Type::try_from(inner.next().unwrap())?;
+                        Type::Array(elems, Box::new(ty))
+                    }
+                    Rule::ty_vector => {
+                        let mut inner = pair.into_inner();
+                        let elems = inner.next().unwrap().as_str().parse().unwrap();
+                        let ty = Type::try_from(inner.next().unwrap())?;
+                        Type::Vector(elems, Box::new(ty))
+                    }
+                    Rule::ty_struct => {
+                        let inner = pair.into_inner();
+                        let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
+                        Type::Struct(types)
+                    }
+                    Rule::ty_packed => {
+                        let inner = pair.into_inner();
+                        let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
+                        Type::Packed(types)
+                    }
+                    p => unreachable!("{p:?}"),
+                };
+                let ty = inner.fold(ty, |ty, _| Type::Ptr(Box::new(ty)));
+                Ok(ty)
             }
-            Rule::ty_vector => {
+            Rule::fnty => {
                 let mut inner = pair.into_inner();
-                let elems = inner.next().unwrap().as_str().parse().unwrap();
-                let ty = Type::try_from(inner.next().unwrap())?;
-                Type::Vector(elems, Box::new(ty))
-            }
-            Rule::ty_struct => {
-                let inner = pair.into_inner();
-                let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
-                Type::Struct(types)
-            }
-            Rule::ty_packed => {
-                let inner = pair.into_inner();
-                let types = inner.map(|p| p.try_into()).collect::<Result<Vec<_>, _>>()?;
-                Type::Packed(types)
+                let ret = inner.next().unwrap().try_into()?;
+                let mut args = vec![];
+                while let Some(p) = inner.peek() {
+                    if p.as_rule() == Rule::ty {
+                        args.push(inner.next().unwrap().try_into()?);
+                    } else {
+                        break;
+                    }
+                }
+                let vararg = inner.next().is_some();
+                Ok(Type::Fn(Box::new(ret), args, vararg))
             }
             p => unreachable!("{p:?}"),
-        };
-        let ty = inner.fold(ty, |ty, _| Type::Ptr(Box::new(ty)));
-        Ok(ty)
+        }
     }
 }
 
@@ -1472,6 +1491,35 @@ fn test_parse_stmt_rhs() {
             pval: Val::Uid(Uid("dst".to_owned())),
             ordering: Ordering::Monotonic,
             align: 8,
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([9 x i8], [9 x i8]* @.str, i32 0, i32 0), i32 %5, i32 %8, i32 %11)",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Call(Call {
+            tail: None,
+            fast_math_flags: None,
+            cconv: None,
+            ret_attrs: vec![],
+            addrspace: None,
+            ty: Type::Fn(Box::new(Type::Id("i32".to_owned())), vec![Type::Ptr(Box::new(Type::Id("i8".to_owned())))], true),
+            val: Val::Gid(Gid("printf".to_owned())),
+            args: vec![
+                Param::Param(Type::Ptr(Box::new(Type::Id("i8".to_owned()))), vec![], Val::ConstExpr(ConstExpr::Gep(true, Type::Array(9, Box::new(Type::Id("i8".to_owned()))), ConstVal::Gid(Gid(".str".to_owned())), vec![ConstVal::Int(0), ConstVal::Int(0)]))), // i8* getelementptr inbounds ([9 x i8], [9 x i8]* @.str, i32 0, i32 0)
+                Param::Param(Type::Id("i32".to_owned()), vec![], Val::Uid(Uid("5".to_owned()))), // i32 %5
+                Param::Param(Type::Id("i32".to_owned()), vec![], Val::Uid(Uid("8".to_owned()))), // i32 %8
+                Param::Param(Type::Id("i32".to_owned()), vec![], Val::Uid(Uid("11".to_owned()))), // i32 %11
+            ],
+            fn_attrs: vec![],
+            // [ operand bundles ] // TODO: impl
         }),
     );
 }
