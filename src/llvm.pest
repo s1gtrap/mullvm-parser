@@ -501,7 +501,10 @@ metadata                    =  { metadata_name ~ "=" ~ metadata_node }
 source_filename   = { "source_filename" ~ "=" ~ string }
 target_datalayout = { "target" ~ "datalayout" ~ "=" ~ string }
 target_triple     = { "target" ~ "triple" ~ "=" ~ string }
-attributes        = { "attributes" ~ attr_group ~ "=" ~ "{" ~ (func_attr | id)* ~ "}" }
+
+attribute_field = { id ~ ":" ~ id | id | string }
+attribute       = { (string | id) ~ ("=" ~ string | "(" ~ (attribute_field ~ ("," ~ attribute_field)*) ~ ")")? }
+attributes      = { "attributes" ~ attr_group ~ "=" ~ "{" ~ attribute* ~ "}" }
 
 declarg  = { ty ~ param_attrs }
 declargs = { (declarg ~ ("," ~ declarg)* ~ ("," ~ vararg)?)? }
