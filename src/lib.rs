@@ -820,6 +820,55 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Store {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct StoreAtomic {
+    volatile: bool,
+    ty: Type,
+    val: Val,
+    pty: Type,
+    pval: Val,
+    ordering: Ordering,
+    align: usize,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for StoreAtomic {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let volatile = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::volatile => {
+                inner.next().unwrap();
+                true
+            }
+            _ => false,
+        };
+        let ty = Type::try_from(inner.next().unwrap())?;
+        let val = Val::try_from(inner.next().unwrap())?;
+        let pty = Type::try_from(inner.next().unwrap())?;
+        let pval = Val::try_from(inner.next().unwrap())?;
+        let ordering = Ordering::try_from(inner.next().unwrap())?;
+        let align = inner
+            .next()
+            .unwrap()
+            .into_inner()
+            .next()
+            .unwrap()
+            .as_str()
+            .parse()
+            .expect("failed to parse align (uint)");
+        Ok(StoreAtomic {
+            volatile,
+            ty,
+            val,
+            pty,
+            pval,
+            ordering,
+            align,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Load {
     volatile: bool,
     ty: Type,
@@ -1291,6 +1340,7 @@ pub enum StmtRhs {
     },
     Alloca(Alloca),
     Store(Store),
+    StoreAtomic(StoreAtomic),
     Call(Call),
     Load(Load),
     LoadAtomic(LoadAtomic),
@@ -1310,6 +1360,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
         match pair.as_rule() {
             Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
             Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
+            Rule::stmt_store_atomic => Ok(StmtRhs::StoreAtomic(StoreAtomic::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_load_atomic => Ok(StmtRhs::LoadAtomic(LoadAtomic::try_from(pair)?)),
             Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
@@ -1521,6 +1572,27 @@ fn test_parse_stmt_rhs() {
             ],
             fn_attrs: vec![],
             // [ operand bundles ] // TODO: impl
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "store atomic i8 %val, ptr %dst monotonic, align 1, !dbg !27542",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::StoreAtomic(StoreAtomic {
+            volatile: false,
+            ty: Type::Id("i8".to_owned()),
+            val: Val::Uid(Uid("val".to_owned())),
+            pty: Type::Id("ptr".to_owned()),
+            pval: Val::Uid(Uid("dst".to_owned())),
+            ordering: Ordering::Monotonic,
+            align: 1,
         }),
     );
 }
