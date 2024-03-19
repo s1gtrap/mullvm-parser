@@ -1332,6 +1332,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             | Rule::stmt_shufflevector
             | Rule::stmt_sitofp
             | Rule::stmt_cmpxchg
+            | Rule::stmt_call_asm
             | Rule::stmt_phi => Ok(StmtRhs::Todo(pair.as_str().to_owned())),
             p => unreachable!("{:?}", p),
         }

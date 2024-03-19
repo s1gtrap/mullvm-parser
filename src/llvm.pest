@@ -290,6 +290,13 @@ stmt_store          = {
     // TODO: !nontemporal, !invariant.group
     "store" ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
 }
+sideeffect          = { "sideeffect" }
+alignstack          = { "alignstack" }
+inteldialect        = { "inteldialect" }
+unwind              = { "unwind" }
+stmt_call_asm       = {
+    "call" ~ (fnty | ty) ~ "asm" ~ sideeffect? ~ alignstack? ~ inteldialect? ~ unwind? ~ string ~ "," ~ string ~ "(" ~ params ~ ")"* ~ ("," ~ named_meta)*
+}
 stmt_call           = {
     tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attrs ~ addr_space? ~ (fnty | ty) ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
@@ -397,6 +404,7 @@ stmt_rhs            = {
     stmt_bop
   | stmt_alloca
   | stmt_store
+  | stmt_call_asm
   | stmt_call
   | stmt_gep
   | stmt_load_atomic
