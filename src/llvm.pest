@@ -59,7 +59,7 @@ cconv = {
 }
 
 vararg = { "..." }
-fnty   = { ty ~ "(" ~ (ty ~ ("," ~ ty)* ~ ("," ~ vararg)? | vararg)? ~ ")" }
+fnty   = { ty ~ "(" ~ (ty ~ ("," ~ ty)* ~ ("," ~ vararg)? | vararg)? ~ ")" ~ star* }
 
 star      = { "*" }
 ty        = { (id | uid | ty_array | ty_vector | ty_struct | ty_packed) ~ star* }
@@ -390,7 +390,7 @@ atomicrmw_op        = {
 stmt_atomicrmw      = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align? ~ ("," ~ named_meta)* }
 stmt_fence          = { "fence" ~ ordering ~ ("," ~ named_meta)* }
 stmt_bitcast        = {
-    "bitcast" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+    "bitcast" ~ ty ~ val ~ "to" ~ (fnty | ty) ~ ("," ~ named_meta)*
 }
 stmt_extractelement = {
     "extractelement" ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ named_meta)*

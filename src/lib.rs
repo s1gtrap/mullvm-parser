@@ -187,6 +187,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
                 Ok(ty)
             }
             Rule::fnty => {
+                println!("{pair:?}");
                 let mut inner = pair.into_inner();
                 let ret = inner.next().unwrap().try_into()?;
                 let mut args = vec![];
@@ -197,8 +198,20 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
                         break;
                     }
                 }
-                let vararg = inner.next().is_some();
-                Ok(Type::Fn(Box::new(ret), args, vararg))
+                let vararg = if let Some(p) = inner.peek() {
+                    if p.as_rule() == Rule::vararg {
+                        inner.next().unwrap();
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                let ty = inner.fold(Type::Fn(Box::new(ret), args, vararg), |ty, _| {
+                    Type::Ptr(Box::new(ty))
+                });
+                Ok(ty)
             }
             p => unreachable!("{p:?}"),
         }
@@ -1816,6 +1829,27 @@ fn test_parse_stmt() {
             },
         ),
     );*/
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(Rule::stmt, "%5 = bitcast i8* %2 to i32 ()*")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("5".to_owned())),
+            StmtRhs::Bitcast(Bitcast {
+                fty: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                val: Val::Uid(Uid("2".to_owned())),
+                tty: Type::Ptr(Box::new(Type::Fn(
+                    Box::new(Type::Id("i32".to_owned())),
+                    vec![],
+                    false,
+                ))),
+            }),
+        ),
+    );
 }
 
 #[derive(Debug, PartialEq)]
