@@ -2364,6 +2364,8 @@ pub enum ConstVal {
     Zinit,
     Undef,
     Null,
+    False,
+    True,
     ConstExpr(Box<ConstExpr>),
 }
 
@@ -2473,6 +2475,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             Some(val) if val.as_rule() == Rule::const_zinit => Some(ConstVal::Zinit),
             Some(val) if val.as_rule() == Rule::const_undef => Some(ConstVal::Undef),
             Some(val) if val.as_rule() == Rule::const_null => Some(ConstVal::Null),
+            Some(val) if val.as_rule() == Rule::const_false => Some(ConstVal::False),
+            Some(val) if val.as_rule() == Rule::const_true => Some(ConstVal::True),
             Some(val) if val.as_rule() == Rule::int => {
                 Some(ConstVal::Int(val.as_str().parse().unwrap()))
             }
@@ -2619,7 +2623,7 @@ fn test_parse_ident_const() {
     );
     assert_eq!(
         Const::try_from(
-            LLVMParser::parse(Rule::ident_const,    r#"@alloc_b58bc021c3e44cc3d3a416ce343bcc6c = private unnamed_addr constant <{ ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8] }> <{ ptr @alloc_cc04218366297a9feed8b11aca7e8ec4, [8 x i8] c"\07\00\00\00\00\00\00\00", ptr @alloc_574d1a2219ebd7ae8db35e273d007636, [8 x i8] c"\08\00\00\00\00\00\00\00", ptr @alloc_081ab6102820eb6dbf606bc2a42bf682, [8 x i8] c"\08\00\00\00\00\00\00\00", ptr @alloc_1713fdbdd59e3f6dd78509f861b8bb36, [8 x i8] c"\04\00\00\00\00\00\00\00", ptr @alloc_228b951a53cd2b066a5833c8dc256a67, [8 x i8] c"\04\00\00\00\00\00\00\00", ptr @alloc_04111f00952c5e02df867bfba0bcedd9, [8 x i8] c"\0E\00\00\00\00\00\00\00" }>, align 8"#)
+            LLVMParser::parse(Rule::ident_const, r#"@alloc_b58bc021c3e44cc3d3a416ce343bcc6c = private unnamed_addr constant <{ ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8], ptr, [8 x i8] }> <{ ptr @alloc_cc04218366297a9feed8b11aca7e8ec4, [8 x i8] c"\07\00\00\00\00\00\00\00", ptr @alloc_574d1a2219ebd7ae8db35e273d007636, [8 x i8] c"\08\00\00\00\00\00\00\00", ptr @alloc_081ab6102820eb6dbf606bc2a42bf682, [8 x i8] c"\08\00\00\00\00\00\00\00", ptr @alloc_1713fdbdd59e3f6dd78509f861b8bb36, [8 x i8] c"\04\00\00\00\00\00\00\00", ptr @alloc_228b951a53cd2b066a5833c8dc256a67, [8 x i8] c"\04\00\00\00\00\00\00\00", ptr @alloc_04111f00952c5e02df867bfba0bcedd9, [8 x i8] c"\0E\00\00\00\00\00\00\00" }>, align 8"#)
                 .unwrap()
                 .next()
                 .unwrap(),
@@ -2641,6 +2645,34 @@ fn test_parse_ident_const() {
             align: Some(8),
                 val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_cc04218366297a9feed8b11aca7e8ec4".to_owned())), ConstVal::String("\\07\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_574d1a2219ebd7ae8db35e273d007636".to_owned())), ConstVal::String("\\08\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_081ab6102820eb6dbf606bc2a42bf682".to_owned())), ConstVal::String("\\08\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_1713fdbdd59e3f6dd78509f861b8bb36".to_owned())), ConstVal::String("\\04\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_228b951a53cd2b066a5833c8dc256a67".to_owned())), ConstVal::String("\\04\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_04111f00952c5e02df867bfba0bcedd9".to_owned())), ConstVal::String("\\0E\\00\\00\\00\\00\\00\\00\\00".to_owned())])),
 
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(
+                Rule::ident_const,
+                r#"@"Example::counter:init" = internal global i1 false"#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: Some(Linkage::Internal),
+            preemp: None,
+            vis: None,
+            store: None,
+            thread_local: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Id("i1".to_owned()),
+            name: Gid(r#""Example::counter:init""#.to_owned()),
+            initializer_constant: None,
+            align: None,
+            val: Some(ConstVal::False),
         },
     );
 }
