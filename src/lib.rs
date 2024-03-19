@@ -2029,7 +2029,7 @@ pub struct Function {
     //section: Option<String>,
     //partition: Option<String>,
     //[comdat [($name)]]
-    //[align N]
+    align: Option<usize>,
     //[gc]
     //[prefix Constant]
     //[prologue Constant]
@@ -2113,6 +2113,20 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
                 break;
             }
         }
+        let align = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::fn_align => Some(
+                iterator
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .unwrap(),
+            ),
+            _ => None,
+        };
         let blocks = iterator
             .map(Block::try_from)
             .collect::<Result<Vec<_>, _>>()?;
@@ -2132,7 +2146,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             //section: Option<String>,
             //partition: Option<String>,
             //[comdat [($name)]]
-            //[align N]
+            align,
             //[gc]
             //[prefix Constant]
             //[prologue Constant]
@@ -2167,6 +2181,7 @@ fn test_parse_function() {
             addr_attr: None,
             addr_space: None,
             func_attrs: vec![],
+            align: None,
             blocks: vec![Block {
                 label: None,
                 insns: vec![],
@@ -2209,6 +2224,50 @@ fn test_parse_function() {
             addr_attr: None,
             addr_space: None,
             func_attrs: vec![],
+            align: None,
+            blocks: vec![Block {
+                label: None,
+                insns: vec![],
+                term: Term::Ret(Type::Id("void".to_owned()), None),
+            }]
+        }
+    );
+    assert_eq!(
+        Function::try_from(
+            LLVMParser::parse(
+                Rule::function,
+                "define void @_ZN4DateC1Eiii(%class.Date* %this, i32 %d, i32 %m, i32 %y) unnamed_addr #1 align 2 {
+    ret void
+}",
+            )
+            .unwrap()
+            .next()
+            .unwrap()
+        )
+        .unwrap(),
+        Function {
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("void".to_owned()),
+            name: Gid("_ZN4DateC1Eiii".to_owned()),
+            args: vec![
+                (
+                    Type::Ptr(Box::new(Type::Uid(Uid("class.Date".to_owned())))),
+                    vec![],
+                    Some(Uid("this".to_owned())),
+                ),
+                (Type::Id("i32".to_owned()), vec![], Some(Uid("d".to_owned()))),
+                (Type::Id("i32".to_owned()), vec![], Some(Uid("m".to_owned()))),
+                (Type::Id("i32".to_owned()), vec![], Some(Uid("y".to_owned()))),
+            ],
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            func_attrs: vec![],
+            align: Some(2),
             blocks: vec![Block {
                 label: None,
                 insns: vec![],

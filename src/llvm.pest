@@ -467,8 +467,9 @@ block_body = { stmt* }
 
 personality = { "personality" ~ ty ~ gid }
 
+fn_align = { "align" ~ uint }
 function = {
-    "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
+    "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ fn_align? ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
 const_val_opt =  { ty ~ ((const_zinit | const_undef | const_str | const_struct | const_packed | const_null | const_expr | gid | int) ~ !"=")? }
