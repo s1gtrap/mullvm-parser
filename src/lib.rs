@@ -1463,6 +1463,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             | Rule::stmt_extractelement
             | Rule::stmt_shufflevector
             | Rule::stmt_sitofp
+            | Rule::stmt_uitofp
             | Rule::stmt_fptosi
             | Rule::stmt_cmpxchg
             | Rule::stmt_call_asm

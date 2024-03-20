@@ -446,6 +446,9 @@ stmt_shufflevector  = {
 stmt_sitofp         = {
     "sitofp" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
+stmt_uitofp         = {
+    "uitofp" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
 stmt_fptosi         = {
     "fptosi" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
@@ -479,6 +482,7 @@ stmt_rhs            = {
   | stmt_extractelement
   | stmt_shufflevector
   | stmt_sitofp
+  | stmt_uitofp
   | stmt_fptosi
   | stmt_cmpxchg
 }
