@@ -1556,6 +1556,25 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Fneg {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Fpext {
+    fty: Type,
+    val: Val,
+    tty: Type,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Fpext {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let fty = inner.next().unwrap().try_into()?;
+        let val = inner.next().unwrap().try_into()?;
+        let tty = inner.next().unwrap().try_into()?;
+        Ok(Fpext { fty, val, tty })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Fptrunc {
     fty: Type,
     val: Val,
@@ -1605,6 +1624,7 @@ pub enum StmtRhs {
     Call(Call),
     Fence(Fence),
     Fneg(Fneg),
+    Fpext(Fpext),
     Fptrunc(Fptrunc),
     Freeze(Freeze),
     Gep(Gep),
@@ -1630,6 +1650,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
             Rule::stmt_fneg => Ok(StmtRhs::Fneg(pair.try_into()?)),
+            Rule::stmt_fpext => Ok(StmtRhs::Fpext(pair.try_into()?)),
             Rule::stmt_fptrunc => Ok(StmtRhs::Fptrunc(pair.try_into()?)),
             Rule::stmt_freeze => Ok(StmtRhs::Freeze(pair.try_into()?)),
             Rule::stmt_gep => Ok(StmtRhs::Gep(Gep::try_from(pair)?)),
@@ -2335,6 +2356,24 @@ fn test_parse_stmt() {
                 fty: Type::Id("double".to_owned()),
                 val: Val::Uid(Uid("n3".to_owned())),
                 tty: Type::Id("float".to_owned()),
+            }),
+        ),
+    );
+
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(Rule::stmt, "%_4 = fpext float %f to double, !dbg !41330")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("_4".to_owned())),
+            StmtRhs::Fpext(Fpext {
+                fty: Type::Id("float".to_owned()),
+                val: Val::Uid(Uid("f".to_owned())),
+                tty: Type::Id("double".to_owned()),
             }),
         ),
     );
