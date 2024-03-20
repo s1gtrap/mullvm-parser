@@ -1103,7 +1103,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Param {
         let mut inner = pair.into_inner();
         let pair = inner.next().unwrap();
         match pair.as_rule() {
-            Rule::ty => {
+            Rule::fnty | Rule::ty => {
                 let ty = pair.try_into()?;
                 let param_attrs = match inner.peek() {
                     Some(pair) if pair.as_rule() == Rule::param_attrs => inner
@@ -1711,6 +1711,38 @@ fn test_parse_stmt_rhs() {
                     ),
                 ),
             ],
+            fn_attrs: vec![],
+            // [ operand bundles ] // TODO: impl
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "call void @GC_set_push_other_roots(%Nil ()* %30)",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Call(Call {
+            tail: None,
+            fast_math_flags: None,
+            cconv: None,
+            ret_attrs: vec![],
+            addrspace: None,
+            ty: Type::Id("void".to_owned()),
+            val: Val::Gid(Gid("GC_set_push_other_roots".to_owned())),
+            args: vec![Param::Param(
+                Type::Ptr(Box::new(Type::Fn(
+                    Box::new(Type::Uid(Uid("Nil".to_owned()))),
+                    vec![],
+                    false
+                ))),
+                vec![],
+                Val::Uid(Uid("30".to_owned())),
+            ),],
             fn_attrs: vec![],
             // [ operand bundles ] // TODO: impl
         }),
