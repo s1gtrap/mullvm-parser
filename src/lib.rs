@@ -539,6 +539,8 @@ pub enum ConstExpr {
     Inttoptr(ConstVal, Type),
     Ptrtoint(ConstVal, Type),
     Bitcast(ConstVal, Type),
+    Trunc(ConstVal, Type),
+    Binop(Binop, ConstVal, ConstVal),
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
@@ -578,6 +580,19 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
                 let val = inner.next().unwrap().try_into()?;
                 let ty = inner.next().unwrap().try_into()?;
                 Ok(ConstExpr::Ptrtoint(val, ty))
+            }
+            Rule::const_trunc => {
+                let mut inner = pair.into_inner();
+                let val = inner.next().unwrap().try_into()?;
+                let ty = inner.next().unwrap().try_into()?;
+                Ok(ConstExpr::Trunc(val, ty))
+            }
+            Rule::const_binop => {
+                let mut inner = pair.into_inner();
+                let binop = inner.next().unwrap().try_into()?;
+                let v1 = inner.next().unwrap().try_into()?;
+                let v2 = inner.next().unwrap().try_into()?;
+                Ok(ConstExpr::Binop(binop, v1, v2))
             }
             _ => unreachable!(),
         }
@@ -735,11 +750,48 @@ pub enum Bop3 {
     Shl,
 }
 
+impl<'i> TryFrom<Pair<'i, Rule>> for Bop3 {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        Ok(match pair.as_rule() {
+            Rule::add => Bop3::Add,
+            Rule::mul => Bop3::Mul,
+            Rule::shl => Bop3::Shl,
+            Rule::sub => Bop3::Sub,
+            _ => unreachable!(),
+        })
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Binop {
     Bop1(Bop1),
     Bop2(Bop2, bool),
     Bop3(Bop3, bool, bool),
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Binop {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let pair = inner.next().unwrap();
+        Ok(match pair.as_rule() {
+            Rule::add | Rule::mul | Rule::shl | Rule::sub => {
+                let nuw = inner
+                    .next()
+                    .map(|p| p.as_rule() == Rule::nuw)
+                    .unwrap_or(false);
+                let nsw = inner
+                    .next()
+                    .map(|p| p.as_rule() == Rule::nuw)
+                    .unwrap_or(false);
+                Binop::Bop3(pair.try_into()?, nuw, nsw)
+            }
+            _ => unreachable!(),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1606,6 +1658,61 @@ fn test_parse_stmt_rhs() {
             pval: Val::Uid(Uid("dst".to_owned())),
             ordering: Ordering::Monotonic,
             align: 1,
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "tail call i8* @malloc(i32 trunc (i64 mul nuw (i64 ptrtoint (i32* getelementptr (i32, i32* null, i32 1) to i64), i64 2) to i32))",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Call(Call {
+            tail: Some(Tail::Tail),
+            fast_math_flags: None,
+            cconv: None,
+            ret_attrs: vec![],
+            addrspace: None,
+            ty: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+            val: Val::Gid(Gid("malloc".to_owned())),
+            args: vec![
+                Param::Param(
+                    Type::Id("i32".to_owned()),
+                    vec![],
+                    Val::ConstExpr(
+                        ConstExpr::Trunc(
+                            ConstVal::ConstExpr(
+                                Box::new(ConstExpr::Binop(
+                                    Binop::Bop3(
+                                        Bop3::Mul,
+                                        true,
+                                        false,
+                                    ),
+                                    ConstVal::ConstExpr(Box::new(ConstExpr::Ptrtoint(
+                                        ConstVal::ConstExpr(
+                                            Box::new(ConstExpr::Gep(
+                                                false,
+                                                Type::Id("i32".to_owned()),
+                                                ConstVal::Null,
+                                                vec![ConstVal::Int(1)],
+                                            )),
+                                        ),
+                                        Type::Id("i64".to_owned()),
+                                    ))),
+                                    ConstVal::Int(2),
+                                )),
+                            ),
+                            Type::Id("i32".to_owned()),
+                        ),
+                    ),
+                ),
+            ],
+            fn_attrs: vec![],
+            // [ operand bundles ] // TODO: impl
         }),
     );
 }
