@@ -1549,24 +1549,43 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Insertelement {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Freeze {
+    ty: Type,
+    val: Val,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Freeze {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let ty = inner.next().unwrap().try_into()?;
+        let val = inner.next().unwrap().try_into()?;
+        Ok(Freeze { ty, val })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
+    Alloca(Alloca),
+    Atomicrmw(Atomicrmw),
     Binop {
         bop: Binop,
         ty: Type,
         op1: Val,
         op2: Val,
     },
-    Alloca(Alloca),
-    Store(Store),
-    StoreAtomic(StoreAtomic),
+    Bitcast(Bitcast),
     Call(Call),
+    Fence(Fence),
+    Freeze(Freeze),
+    Gep(Gep),
+    Insertelement(Insertelement),
     Load(Load),
     LoadAtomic(LoadAtomic),
-    Atomicrmw(Atomicrmw),
-    Fence(Fence),
-    Gep(Gep),
-    Bitcast(Bitcast),
-    Insertelement(Insertelement),
+    Store(Store),
+    StoreAtomic(StoreAtomic),
+
     Todo(String),
 }
 
@@ -1582,6 +1601,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_bitcast => Ok(StmtRhs::Bitcast(Bitcast::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
+            Rule::stmt_freeze => Ok(StmtRhs::Freeze(pair.try_into()?)),
             Rule::stmt_gep => Ok(StmtRhs::Gep(Gep::try_from(pair)?)),
             Rule::stmt_insertelement => Ok(StmtRhs::Insertelement(pair.try_into()?)),
             Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
@@ -2239,6 +2259,25 @@ fn test_parse_stmt() {
             }),
         ),
     );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                "%_5.1.i.i.fr.i.i.i.i.i.i.i = freeze i64 %_7.sroa.4.0.copyload",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("_5.1.i.i.fr.i.i.i.i.i.i.i".to_owned())),
+            StmtRhs::Freeze(Freeze {
+                ty: Type::Id("i64".to_owned()),
+                val: Val::Uid(Uid("_7.sroa.4.0.copyload".to_owned())),
+            }),
+        ),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -2293,7 +2332,7 @@ fn test_parse_term() {
     use pest::Parser;
     assert_eq!(
         Term::try_from(
-            LLVMParser::parse(Rule::term, "br i1 %6, label %then, label %else",)
+            LLVMParser::parse(Rule::term, "br i1 %6, label %then, label %else")
                 .unwrap()
                 .next()
                 .unwrap(),
@@ -2313,7 +2352,7 @@ fn test_parse_term() {
                 .unwrap(),
         )
         .unwrap(),
-        Term::Cbr(Val::True, Uid("body".to_owned()), Uid("exit".to_owned()),),
+        Term::Cbr(Val::True, Uid("body".to_owned()), Uid("exit".to_owned())),
     );
 }
 
