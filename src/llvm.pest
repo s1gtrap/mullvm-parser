@@ -440,6 +440,9 @@ stmt_fence          = { "fence" ~ ordering ~ ("," ~ named_meta)* }
 stmt_fptosi         = {
     "fptosi" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
+stmt_fneg           = {
+    "fneg" ~ ty ~ val ~ ("," ~ named_meta)*
+}
 stmt_freeze         = {
     "freeze" ~ ty ~ val ~ ("," ~ named_meta)*
 }
@@ -482,6 +485,7 @@ stmt_rhs            = {
   | stmt_fcmp
   | stmt_fence
   | stmt_fptosi
+  | stmt_fneg
   | stmt_freeze
   | stmt_gep
   | stmt_icmp

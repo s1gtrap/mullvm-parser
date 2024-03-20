@@ -1539,6 +1539,23 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Insertelement {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Fneg {
+    ty: Type,
+    val: Val,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Fneg {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let ty = inner.next().unwrap().try_into()?;
+        let val = inner.next().unwrap().try_into()?;
+        Ok(Fneg { ty, val })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Freeze {
     ty: Type,
     val: Val,
@@ -1568,6 +1585,7 @@ pub enum StmtRhs {
     Bitcast(Bitcast),
     Call(Call),
     Fence(Fence),
+    Fneg(Fneg),
     Freeze(Freeze),
     Gep(Gep),
     Insertelement(Insertelement),
@@ -1591,6 +1609,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_bitcast => Ok(StmtRhs::Bitcast(Bitcast::try_from(pair)?)),
             Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
+            Rule::stmt_fneg => Ok(StmtRhs::Fneg(pair.try_into()?)),
             Rule::stmt_freeze => Ok(StmtRhs::Freeze(pair.try_into()?)),
             Rule::stmt_gep => Ok(StmtRhs::Gep(Gep::try_from(pair)?)),
             Rule::stmt_insertelement => Ok(StmtRhs::Insertelement(pair.try_into()?)),
@@ -1961,6 +1980,19 @@ fn test_parse_stmt_rhs() {
             pty: Type::Id("ptr".to_owned()),
             pval: Val::Uid(Uid("14".to_owned())),
             align: Some(4),
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(Rule::stmt_rhs, "fneg double %_21, !dbg !34547")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Fneg(Fneg {
+            ty: Type::Id("double".to_owned()),
+            val: Val::Uid(Uid("_21".to_owned())),
         }),
     );
 }
