@@ -1436,6 +1436,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             Rule::stmt_bop
             | Rule::stmt_ptrtoint
             | Rule::stmt_icmp
+            | Rule::stmt_fcmp
             | Rule::stmt_select
             | Rule::stmt_insertvalue
             | Rule::stmt_landingpad
@@ -1447,6 +1448,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
             | Rule::stmt_extractelement
             | Rule::stmt_shufflevector
             | Rule::stmt_sitofp
+            | Rule::stmt_fptosi
             | Rule::stmt_cmpxchg
             | Rule::stmt_call_asm
             | Rule::stmt_phi => Ok(StmtRhs::Todo(pair.as_str().to_owned())),
@@ -2758,6 +2760,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             Some(val) if val.as_rule() == Rule::const_true => Some(ConstVal::True),
             Some(val) if val.as_rule() == Rule::int => {
                 Some(ConstVal::Int(val.as_str().parse().unwrap()))
+            }
+            Some(val) if val.as_rule() == Rule::const_expr => {
+                Some(ConstVal::ConstExpr(Box::new(val.try_into()?)))
             }
             Some(p) => todo!("{p:?}"),
             None => None,

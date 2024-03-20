@@ -218,6 +218,7 @@ and      = { "and" }
 ashr     = { "ashr" }
 disjoint = { "disjoint" }
 fdiv     = { "fdiv" }
+fmul     = { "fmul" }
 fsub     = { "fsub" }
 lshr     = { "lshr" }
 mul      = { "mul" }
@@ -238,7 +239,7 @@ bop = {
   | ((udiv | sdiv | lshr | ashr) ~ exact?)
   | (or ~ disjoint?)
   | (urem | srem | and | xor)
-  | ((fdiv | fsub) ~ fast_math_flags?)
+  | ((fdiv | fmul | fsub) ~ fast_math_flags?)
 }
 
 const_gep      = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
@@ -355,7 +356,28 @@ cond                = {
   | "sle"
 }
 stmt_icmp           = {
-    "icmp" ~ cond ~ ty ~ val ~ "," ~ val ~ ("," ~ metadata_name ~ metadata_num)*
+    "icmp" ~ cond ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)*
+}
+fcond               = {
+    "false"
+  | "oeq"
+  | "ogt"
+  | "oge"
+  | "olt"
+  | "ole"
+  | "one"
+  | "ord"
+  | "ueq"
+  | "ugt"
+  | "uge"
+  | "ult"
+  | "ule"
+  | "une"
+  | "uno"
+  | "true"
+}
+stmt_fcmp           = {
+    "fcmp" ~ fast_math_flags* ~ fcond ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)*
 }
 selty               = {
     "i1"
@@ -422,6 +444,9 @@ stmt_shufflevector  = {
 stmt_sitofp         = {
     "sitofp" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
+stmt_fptosi         = {
+    "fptosi" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
 weak                = { "weak" }
 stmt_cmpxchg        = { "cmpxchg" ~ weak? ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ordering ~ ordering ~ align? ~ ("," ~ named_meta)* }
 stmt_rhs            = {
@@ -436,6 +461,7 @@ stmt_rhs            = {
   | stmt_load
   | stmt_ptrtoint
   | stmt_icmp
+  | stmt_fcmp
   | stmt_select
   | stmt_insertvalue
   | stmt_landingpad
@@ -451,6 +477,7 @@ stmt_rhs            = {
   | stmt_extractelement
   | stmt_shufflevector
   | stmt_sitofp
+  | stmt_fptosi
   | stmt_cmpxchg
 }
 
