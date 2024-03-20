@@ -601,18 +601,19 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstExpr {
 
 #[derive(Debug, PartialEq)]
 pub enum Val {
-    Int(i128),
-    Float(f64),
-    Uid(Uid),
-    Gid(Gid),
-    True,
-    False,
-    Poison,
-    Undef,
-    Null,
-    Zinit,
-    Struct(Vec<Val>),
     ConstExpr(ConstExpr),
+    False,
+    Float(f64),
+    Gid(Gid),
+    Hex(i128),
+    Int(i128),
+    Null,
+    Poison,
+    Struct(Vec<Val>),
+    True,
+    Uid(Uid),
+    Undef,
+    Zinit,
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Val {
@@ -633,6 +634,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                         Ok(Val::Float(base * exp))
                     }
                     Rule::int => Ok(Val::Int(pair.as_str().parse().unwrap())),
+                    Rule::hex => Ok(Val::Hex(
+                        i128::from_str_radix(&pair.as_str()[2..], 16).unwrap(),
+                    )),
                     Rule::uid => Ok(Val::Uid(pair.try_into()?)),
                     Rule::gid => Ok(Val::Gid(pair.try_into()?)),
                     Rule::val_true => Ok(Val::True),
@@ -1775,6 +1779,26 @@ fn test_parse_stmt_rhs() {
             ))))),
             pval: Val::Gid(Gid("pcre_malloc".to_owned())),
             align: None,
+        }),
+    );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "store float 0x7FF0000000000000, ptr %14, align 4, !dbg !3098",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Store(Store {
+            volatile: false,
+            ty: Type::Id("float".to_owned()),
+            val: Val::Hex(0x7FF0000000000000),
+            pty: Type::Id("ptr".to_owned()),
+            pval: Val::Uid(Uid("14".to_owned())),
+            align: Some(4),
         }),
     );
 }
