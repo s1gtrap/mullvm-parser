@@ -588,8 +588,13 @@ declare  = {
     "declare" ~ linkage? ~ cconv? ~ param_attrs ~ (fnty | ty) ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
 }
 
+alias = {
+    gid ~ "=" ~ linkage? ~ thread_local? ~ addr_attr? ~ "alias" ~ (fnty | ty) ~ "," ~ (fnty | ty) ~ gid
+}
+
 definition = {
     function
+  | alias
   | declare
   | ident_type
   | ident_const

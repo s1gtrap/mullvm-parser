@@ -2712,6 +2712,88 @@ impl<'i> TryFrom<Pair<'i, Rule>> for ConstVal {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Alias {
+    name: Gid,
+    linkage: Option<Linkage>,
+    preemp: Option<Preemp>,
+    vis: Option<Visibility>,
+    store: Option<DLLStorageClass>,
+    thread_local: Option<ThreadLocal>,
+    addr_attr: Option<AddrAttr>,
+    ty: Type,
+    pty: Type,
+    val: Gid,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Alias {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let name: Gid = inner.next().unwrap().try_into()?;
+        let linkage = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let thread_local = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::thread_local => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let addr_attr = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::addr_attr => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let ty = inner.next().unwrap().try_into()?;
+        let pty = inner.next().unwrap().try_into()?;
+        let val = inner.next().unwrap().try_into()?;
+        Ok(Alias {
+            name,
+            linkage,
+            preemp: None,
+            vis: None,
+            store: None,
+            thread_local,
+            addr_attr,
+            ty,
+            pty,
+            val,
+        })
+    }
+}
+
+#[test]
+fn test_parse_alias() {
+    use pest::Parser;
+    assert_eq!(
+        Alias::try_from(
+            LLVMParser::parse(Rule::alias, r#"@"_ZN66_$LT$regex..regex..string..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h014ffb457cf246ccE" = unnamed_addr alias i1 (ptr, ptr), ptr @"_ZN65_$LT$regex..regex..bytes..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h0f5546db75e83286E""#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Alias {
+            name: Gid(r#""_ZN66_$LT$regex..regex..string..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h014ffb457cf246ccE""#.to_owned()),
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            thread_local: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            ty: Type::Fn(Box::new(Type::Id("i1".to_owned())), vec![Type::Id("ptr".to_owned()), Type::Id("ptr".to_owned())], false),
+            pty: Type::Id("ptr".to_owned()),
+            val: Gid(r#""_ZN65_$LT$regex..regex..bytes..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h0f5546db75e83286E""#.to_owned()),
+        },
+    );
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Const {
     linkage: Option<Linkage>,
     preemp: Option<Preemp>,
@@ -3296,15 +3378,16 @@ fn test_parse_declaration() {
 
 #[derive(Debug, PartialEq)]
 pub enum Definition {
-    Function(Function),
+    Alias(Alias),
+    Attributes, // TODO: impl
+    Const(Const),
     Declaration(Declaration),
+    Function(Function),
     IdentType(IdentType),
+    Metadata, // TODO: impl
     SourceFilename(String),
     TargetDatalayout(String),
     TargetTriple(String),
-    Const(Const),
-    Attributes, // TODO: impl
-    Metadata,   // TODO: impl
 }
 
 impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
@@ -3314,6 +3397,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Definition {
         let mut inner = pair.into_inner();
         let item = inner.next().unwrap();
         match item.as_rule() {
+            Rule::alias => Ok(Definition::Alias(item.try_into()?)),
             Rule::function => Ok(Definition::Function(item.try_into()?)),
             Rule::declare => Ok(Definition::Declaration(item.try_into()?)),
             Rule::ident_type => Ok(Definition::IdentType(item.try_into()?)),
@@ -3682,6 +3766,30 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             align: None,
             // metadata: TODO // TODO: impl
             val: Some(ConstVal::Array(vec![ConstVal::ConstExpr(Box::new(ConstExpr::Bitcast(ConstVal::Gid(Gid("\"'skip'\"".to_owned())), Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))))])),
+        }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(
+                Rule::definition,
+                r#"@"_ZN66_$LT$regex..regex..string..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h014ffb457cf246ccE" = unnamed_addr alias i1 (ptr, ptr), ptr @"_ZN65_$LT$regex..regex..bytes..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h0f5546db75e83286E""#,
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Definition::Alias(Alias {
+            name: Gid(r#""_ZN66_$LT$regex..regex..string..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h014ffb457cf246ccE""#.to_owned()),
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            thread_local: None,
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            ty: Type::Fn(Box::new(Type::Id("i1".to_owned())), vec![Type::Id("ptr".to_owned()), Type::Id("ptr".to_owned())], false),
+            pty: Type::Id("ptr".to_owned()),
+            val: Gid(r#""_ZN65_$LT$regex..regex..bytes..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h0f5546db75e83286E""#.to_owned()),
         }),
     );
 }
