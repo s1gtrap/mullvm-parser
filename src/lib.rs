@@ -1747,6 +1747,34 @@ fn test_parse_stmt_rhs() {
             // [ operand bundles ] // TODO: impl
         }),
     );
+    assert_eq!(
+        StmtRhs::try_from(
+            LLVMParser::parse(
+                Rule::stmt_rhs,
+                "store i8* (i64)* %60, i8* (i64)** @pcre_malloc",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        StmtRhs::Store(Store {
+            volatile: false,
+            ty: Type::Ptr(Box::new(Type::Fn(
+                Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned())))),
+                vec![Type::Id("i64".to_owned())],
+                false,
+            ))),
+            val: Val::Uid(Uid("60".to_owned())),
+            pty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Fn(
+                Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned())))),
+                vec![Type::Id("i64".to_owned())],
+                false,
+            ))))),
+            pval: Val::Gid(Gid("pcre_malloc".to_owned())),
+            align: None,
+        }),
+    );
 }
 
 #[derive(Debug, PartialEq)]
