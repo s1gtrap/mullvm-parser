@@ -3274,12 +3274,50 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
     );
     assert_eq!(
         Definition::try_from(
-            LLVMParser::parse(Rule::definition,"attributes #0 = { uwtable \"no-frame-pointer-elim\"=\"true\" \"no-frame-pointer-elim-non-leaf\"=\"true\" }")
+            LLVMParser::parse(Rule::definition, "attributes #0 = { uwtable \"no-frame-pointer-elim\"=\"true\" \"no-frame-pointer-elim-non-leaf\"=\"true\" }")
                 .unwrap()
                 .next()
                 .unwrap(),
         )
         .unwrap(),
         Definition::Attributes,
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, "%struct.__sFILE = type { i8*, i32, i32, i16, i16, %struct.__sbuf, i32, i8*, i32 (i8*)*, i32 (i8*, i8*, i32)*, i64 (i8*, i64, i32)*, i32 (i8*, i8*, i32)*, %struct.__sbuf, %struct.__sFILEX*, i32, [3 x i8], [1 x i8], %struct.__sbuf, i32, i64 }")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::IdentType(
+            IdentType(
+                "struct.__sFILE".to_owned(),
+                Type::Struct(
+                    vec![
+                        Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                        Type::Id("i32".to_owned()),
+                        Type::Id("i32".to_owned()),
+                        Type::Id("i16".to_owned()),
+                        Type::Id("i16".to_owned()),
+                        Type::Uid(Uid("struct.__sbuf".to_owned())),
+                        Type::Id("i32".to_owned()),
+                        Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                        Type::Ptr(Box::new(Type::Fn(Box::new(Type::Id("i32".to_owned())), vec![Type::Ptr(Box::new(Type::Id("i8".to_owned())))], false))),
+                        Type::Ptr(Box::new(Type::Fn(Box::new(Type::Id("i32".to_owned())), vec![Type::Ptr(Box::new(Type::Id("i8".to_owned()))), Type::Ptr(Box::new(Type::Id("i8".to_owned()))), Type::Id("i32".to_owned())], false))),
+                        Type::Ptr(Box::new(Type::Fn(Box::new(Type::Id("i64".to_owned())), vec![Type::Ptr(Box::new(Type::Id("i8".to_owned()))), Type::Id("i64".to_owned()), Type::Id("i32".to_owned())], false))),
+                        Type::Ptr(Box::new(Type::Fn(Box::new(Type::Id("i32".to_owned())), vec![Type::Ptr(Box::new(Type::Id("i8".to_owned()))), Type::Ptr(Box::new(Type::Id("i8".to_owned()))), Type::Id("i32".to_owned())], false))),
+                        Type::Uid(Uid("struct.__sbuf".to_owned())),
+                        Type::Ptr(Box::new(Type::Uid(Uid("struct.__sFILEX".to_owned())))),
+                        Type::Id("i32".to_owned()),
+                        Type::Array(3, Box::new(Type::Id("i8".to_owned()))),
+                        Type::Array(1, Box::new(Type::Id("i8".to_owned()))),
+                        Type::Uid(Uid("struct.__sbuf".to_owned())),
+                        Type::Id("i32".to_owned()),
+                        Type::Id("i64".to_owned()),
+                    ],
+                ),
+            ),
+        ),
     );
 }

@@ -63,10 +63,10 @@ fnty   = { ty ~ "(" ~ (ty ~ ("," ~ ty)* ~ ("," ~ vararg)? | vararg)? ~ ")" ~ sta
 
 star      = { "*" }
 ty        = { (id | uid | ty_array | ty_vector | ty_struct | ty_packed) ~ star* }
-ty_array  = { "[" ~ uint ~ "x" ~ ty ~ "]" }
-ty_vector = { "<" ~ uint ~ "x" ~ ty ~ ">" }
-ty_struct = { "{" ~ (ty ~ ("," ~ ty)*)? ~ "}" }
-ty_packed = { "<{" ~ (ty ~ ("," ~ ty)*)? ~ "}>" }
+ty_array  = { "[" ~ uint ~ "x" ~ (fnty | ty) ~ "]" }
+ty_vector = { "<" ~ uint ~ "x" ~ (fnty | ty) ~ ">" }
+ty_struct = { "{" ~ ((fnty | ty) ~ ("," ~ (fnty | ty))*)? ~ "}" }
+ty_packed = { "<{" ~ ((fnty | ty) ~ ("," ~ (fnty | ty))*)? ~ "}>" }
 
 param_attr  = {
     "zeroext"
