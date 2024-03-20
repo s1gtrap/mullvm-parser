@@ -2017,6 +2017,27 @@ fn test_parse_stmt() {
             }),
         ),
     );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(Rule::stmt, "%61 = bitcast i8* (i64)* %60 to i8*")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("61".to_owned())),
+            StmtRhs::Bitcast(Bitcast {
+                fty: Type::Ptr(Box::new(Type::Fn(
+                    Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned())))),
+                    vec![Type::Id("i64".to_owned())],
+                    false,
+                ))),
+                val: Val::Uid(Uid("60".to_owned())),
+                tty: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+            }),
+        ),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -2923,7 +2944,9 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
             _ => vec![],
         };
         let ret = match inner.peek() {
-            Some(pair) if pair.as_rule() == Rule::ty => inner.next().unwrap().try_into()?,
+            Some(pair) if pair.as_rule() == Rule::fnty || pair.as_rule() == Rule::ty => {
+                inner.next().unwrap().try_into()?
+            }
             p => unreachable!("{p:?}"),
         };
         let name = match inner.peek() {
@@ -3050,6 +3073,74 @@ fn test_parse_declaration() {
             name: Gid("rust_eh_personality".to_owned()),
             args: vec![], // FIXME: should maybe note varargs?
             addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            func_attrs: vec![],
+            //| attr_group)*
+            //personality: Option<Personality>,
+            //named_meta*: ???
+        },
+    );
+    assert_eq!(
+        Declaration::try_from(
+            LLVMParser::parse(
+                Rule::declare,
+                "declare i32 @_Unwind_Backtrace(i32 (i8*, i8*)*, i8*)",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Declaration {
+            linkage: None,
+            vis: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("i32".to_owned()),
+            name: Gid("_Unwind_Backtrace".to_owned()),
+            args: vec![
+                (
+                    Type::Ptr(Box::new(Type::Fn(
+                        Box::new(Type::Id("i32".to_owned())),
+                        vec![
+                            Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                            Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                        ],
+                        false,
+                    ))),
+                    vec![]
+                ),
+                (Type::Ptr(Box::new(Type::Id("i8".to_owned()))), vec![]),
+            ],
+            addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            //| attr_group)*
+            //personality: Option<Personality>,
+            //named_meta*: ???
+        },
+    );
+    assert_eq!(
+        Declaration::try_from(
+            LLVMParser::parse(Rule::declare, "declare %Nil ()* @GC_get_push_other_roots()")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Declaration {
+            linkage: None,
+            vis: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Ptr(Box::new(Type::Fn(
+                Box::new(Type::Uid(Uid("Nil".to_owned()))),
+                vec![],
+                false,
+            ))),
+            name: Gid("GC_get_push_other_roots".to_owned()),
+            args: vec![],
+            addr_attr: None,
             addr_space: None,
             func_attrs: vec![],
             //| attr_group)*
