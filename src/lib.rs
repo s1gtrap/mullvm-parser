@@ -2043,7 +2043,7 @@ fn test_parse_stmt() {
 #[derive(Debug, PartialEq)]
 pub enum Term {
     Br(Uid),
-    Cbr(Uid, Uid, Uid),
+    Cbr(Val, Uid, Uid),
     Ret(Type, Option<Val>),
     Unreachable,
     Todo(String),
@@ -2073,7 +2073,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Term {
             }
             Rule::term_cbr => {
                 let mut inner = pair.into_inner();
-                let cnd = Uid::try_from(inner.next().unwrap())?;
+                let cnd = Val::try_from(inner.next().unwrap())?;
                 let thn = Uid::try_from(inner.next().unwrap())?;
                 let els = Uid::try_from(inner.next().unwrap())?;
                 Ok(Term::Cbr(cnd, thn, els))
@@ -2099,10 +2099,20 @@ fn test_parse_term() {
         )
         .unwrap(),
         Term::Cbr(
-            Uid("6".to_owned()),
+            Val::Uid(Uid("6".to_owned())),
             Uid("then".to_owned()),
             Uid("else".to_owned()),
         ),
+    );
+    assert_eq!(
+        Term::try_from(
+            LLVMParser::parse(Rule::term, "br i1 true, label %body, label %exit")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Term::Cbr(Val::True, Uid("body".to_owned()), Uid("exit".to_owned()),),
     );
 }
 
@@ -2220,7 +2230,7 @@ fn test_parse_block() {
                 ),
             ],
             term: Term::Cbr(
-                Uid("6".to_owned()),
+                Val::Uid(Uid("6".to_owned())),
                 Uid("then".to_owned()),
                 Uid("else".to_owned()),
             ),

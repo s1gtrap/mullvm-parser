@@ -460,7 +460,7 @@ stmt = {
 
 term_ret         = { "ret" ~ ty ~ val? ~ ("," ~ metadata_name ~ metadata_num)* }
 term_br          = { "br" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
-term_cbr         = { "br" ~ "i1" ~ uid ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
+term_cbr         = { "br" ~ "i1" ~ val ~ "," ~ "label" ~ uid ~ "," ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)* }
 term_unreachable = { "unreachable" ~ ("," ~ metadata_name ~ metadata_num)* }
 term_invoke      = {
     (uid ~ "=")? ~ "invoke" ~ cconv? ~ param_attr* ~ addr_space? ~ ty ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ "to" ~ "label" ~ uid ~ "unwind" ~ "label" ~ uid ~ ("," ~ metadata_name ~ metadata_num)*
