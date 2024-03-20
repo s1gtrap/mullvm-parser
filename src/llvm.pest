@@ -486,7 +486,7 @@ block      = {
 block_head = { label? }
 block_body = { stmt* }
 
-personality = { "personality" ~ ty ~ gid }
+personality = { "personality" ~ (fnty | ty) ~ gid }
 
 fn_align = { "align" ~ uint }
 function = {

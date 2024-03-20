@@ -2497,6 +2497,47 @@ fn test_parse_function() {
             }]
         }
     );
+    assert_eq!(
+        Function::try_from(
+            LLVMParser::parse(
+                Rule::function,
+                    "define internal void @\"*IO::FileDescriptor+@IO::FileDescriptor#finalize:Nil\"(i32* %self) #0 personality i32 (i32, i32, i64, %\"struct.LibUnwind::Exception.36\"*, i8*)* @__crystal_personality {
+    ret void
+}",
+            )
+            .unwrap()
+            .next()
+            .unwrap()
+        )
+        .unwrap(),
+        Function {
+            linkage: Some(Linkage::Internal),
+            preemp: None,
+            vis: None,
+            store: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("void".to_owned()),
+            name: Gid("\"*IO::FileDescriptor+@IO::FileDescriptor#finalize:Nil\"".to_owned()),
+            args: vec![
+                (
+                    Type::Ptr(Box::new(Type::Id("i32".to_owned()))),
+                    vec![],
+                    Some(Uid("self".to_owned())),
+                ),
+            ],
+            addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            align: None,
+            // FIXME: parse personality
+            blocks: vec![Block {
+                label: None,
+                insns: vec![],
+                term: Term::Ret(Type::Id("void".to_owned()), None),
+            }],
+        }
+    );
 }
 
 #[derive(Debug, PartialEq)]
