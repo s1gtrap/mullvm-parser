@@ -1278,6 +1278,31 @@ fn test_parse_call_stmt() {
                               // [ operand bundles ] // TODO: impl
         },
     );
+    assert_eq!(
+        Call::try_from(
+            LLVMParser::parse(Rule::stmt_call, "call void @llvm.dbg.value(metadata !DIArgList(ptr %hirs.val, i64 %hirs.val19), metadata !3422, metadata !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_constu, 48, DW_OP_mul, DW_OP_plus, DW_OP_stack_value, DW_OP_LLVM_fragment, 64, 64)), !dbg !3444")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Call {
+            tail: None,
+            fast_math_flags: None,
+            cconv: None,
+            ret_attrs: vec![],
+            addrspace: None, // TODO: impl
+            ty: Type::Id("void".to_owned()),
+            val: Val::Gid(Gid("llvm.dbg.value".to_owned())),
+            args: vec![
+                Param::Metadata,
+                Param::Metadata,
+                Param::Metadata,
+            ],
+            fn_attrs: vec![], // TODO: impl
+                              // [ operand bundles ] // TODO: impl
+        },
+    );
 }
 
 #[derive(Debug, PartialEq)]

@@ -294,7 +294,8 @@ fast_math_flags = {
 inalloca = { "inalloca" }
 volatile = { "volatile" }
 
-param          = { (param_metadata ~ metadata_val) | (param_metadata? ~ (fnty | ty) ~ param_attrs ~ val) }
+metadata_call  = { metadata_name ~ "(" ~ params ~ ")" }
+param          = { (param_metadata ~ metadata_call) | (param_metadata ~ metadata_val) | (param_metadata? ~ (fnty | ty) ~ param_attrs ~ val) }
 param_metadata = { "metadata" }
 params         = { (param ~ ("," ~ param)*)? }
 
