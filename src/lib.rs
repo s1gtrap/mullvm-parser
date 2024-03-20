@@ -1517,6 +1517,38 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Bitcast {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Insertelement {
+    vty: Type,
+    vval: Val,
+    ety: Type,
+    eval: Val,
+    ity: Type,
+    ival: Val,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Insertelement {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        let mut inner = pair.into_inner();
+        let vty = inner.next().unwrap().try_into()?;
+        let vval = inner.next().unwrap().try_into()?;
+        let ety = inner.next().unwrap().try_into()?;
+        let eval = inner.next().unwrap().try_into()?;
+        let ity = inner.next().unwrap().try_into()?;
+        let ival = inner.next().unwrap().try_into()?;
+        Ok(Insertelement {
+            vty,
+            vval,
+            ety,
+            eval,
+            ity,
+            ival,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum StmtRhs {
     Binop {
         bop: Binop,
@@ -1534,6 +1566,7 @@ pub enum StmtRhs {
     Fence(Fence),
     Gep(Gep),
     Bitcast(Bitcast),
+    Insertelement(Insertelement),
     Todo(String),
 }
 
@@ -1545,35 +1578,36 @@ impl<'i> TryFrom<Pair<'i, Rule>> for StmtRhs {
         let pair = inner.next().unwrap();
         match pair.as_rule() {
             Rule::stmt_alloca => Ok(StmtRhs::Alloca(Alloca::try_from(pair)?)),
-            Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
-            Rule::stmt_store_atomic => Ok(StmtRhs::StoreAtomic(StoreAtomic::try_from(pair)?)),
-            Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
-            Rule::stmt_load_atomic => Ok(StmtRhs::LoadAtomic(LoadAtomic::try_from(pair)?)),
-            Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
             Rule::stmt_atomicrmw => Ok(StmtRhs::Atomicrmw(Atomicrmw::try_from(pair)?)),
+            Rule::stmt_bitcast => Ok(StmtRhs::Bitcast(Bitcast::try_from(pair)?)),
+            Rule::stmt_call => Ok(StmtRhs::Call(Call::try_from(pair)?)),
             Rule::stmt_fence => Ok(StmtRhs::Fence(Fence::try_from(pair)?)),
             Rule::stmt_gep => Ok(StmtRhs::Gep(Gep::try_from(pair)?)),
-            Rule::stmt_bitcast => Ok(StmtRhs::Bitcast(Bitcast::try_from(pair)?)),
+            Rule::stmt_insertelement => Ok(StmtRhs::Insertelement(pair.try_into()?)),
+            Rule::stmt_load => Ok(StmtRhs::Load(Load::try_from(pair)?)),
+            Rule::stmt_load_atomic => Ok(StmtRhs::LoadAtomic(LoadAtomic::try_from(pair)?)),
+            Rule::stmt_store => Ok(StmtRhs::Store(Store::try_from(pair)?)),
+            Rule::stmt_store_atomic => Ok(StmtRhs::StoreAtomic(StoreAtomic::try_from(pair)?)),
             Rule::stmt_bop
-            | Rule::stmt_ptrtoint
-            | Rule::stmt_icmp
-            | Rule::stmt_fcmp
-            | Rule::stmt_select
-            | Rule::stmt_insertvalue
-            | Rule::stmt_landingpad
-            | Rule::stmt_extractvalue
-            | Rule::stmt_trunc
-            | Rule::stmt_zext
-            | Rule::stmt_inttoptr
-            | Rule::stmt_sext
+            | Rule::stmt_call_asm
+            | Rule::stmt_cmpxchg
             | Rule::stmt_extractelement
+            | Rule::stmt_extractvalue
+            | Rule::stmt_fcmp
+            | Rule::stmt_fptosi
+            | Rule::stmt_icmp
+            | Rule::stmt_insertvalue
+            | Rule::stmt_inttoptr
+            | Rule::stmt_landingpad
+            | Rule::stmt_phi
+            | Rule::stmt_ptrtoint
+            | Rule::stmt_select
+            | Rule::stmt_sext
             | Rule::stmt_shufflevector
             | Rule::stmt_sitofp
+            | Rule::stmt_trunc
             | Rule::stmt_uitofp
-            | Rule::stmt_fptosi
-            | Rule::stmt_cmpxchg
-            | Rule::stmt_call_asm
-            | Rule::stmt_phi => Ok(StmtRhs::Todo(pair.as_str().to_owned())),
+            | Rule::stmt_zext => Ok(StmtRhs::Todo(pair.as_str().to_owned())),
             p => unreachable!("{:?}", p),
         }
     }
@@ -2179,6 +2213,29 @@ fn test_parse_stmt() {
                 ))),
                 val: Val::Uid(Uid("60".to_owned())),
                 tty: Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+            }),
+        ),
+    );
+    assert_eq!(
+        Stmt::try_from(
+            LLVMParser::parse(
+                Rule::stmt,
+                "%33 = insertelement <8 x i8> %0, i8 %_7.val, i64 2, !dbg !19513"
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Stmt(
+            Some(Uid("33".to_owned())),
+            StmtRhs::Insertelement(Insertelement {
+                vty: Type::Vector(8, Box::new(Type::Id("i8".to_owned()))),
+                vval: Val::Uid(Uid("0".to_owned())),
+                ety: Type::Id("i8".to_owned()),
+                eval: Val::Uid(Uid("_7.val".to_owned())),
+                ity: Type::Id("i64".to_owned()),
+                ival: Val::Int(2),
             }),
         ),
     );

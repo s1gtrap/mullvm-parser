@@ -61,6 +61,10 @@ cconv = {
 
 vararg = { "..." }
 fnty   = { ty ~ "(" ~ (ty ~ ("," ~ ty)* ~ ("," ~ vararg)? | vararg)? ~ ")" ~ star* }
+selty  = {
+    "i1"
+  | ("<" ~ uint ~ "x" ~ "i1" ~ ">")
+}
 
 star      = { "*" }
 ty        = { (id | uid | ty_array | ty_vector | ty_struct | ty_packed) ~ star* }
@@ -294,8 +298,9 @@ fast_math_flags = {
 inalloca = { "inalloca" }
 volatile = { "volatile" }
 
-metadata_call  = { metadata_name ~ "(" ~ params ~ ")" }
-param          = { (param_metadata ~ metadata_call) | (param_metadata ~ metadata_val) | (param_metadata? ~ (fnty | ty) ~ param_attrs ~ val) }
+metadata_call = { metadata_name ~ "(" ~ params ~ ")" }
+param         = { (param_metadata ~ metadata_call) | (param_metadata ~ metadata_val) | (param_metadata? ~ (fnty | ty) ~ param_attrs ~ val) }
+
 param_metadata = { "metadata" }
 params         = { (param ~ ("," ~ param)*)? }
 
@@ -308,46 +313,40 @@ ordering = {
   | "seq_cst"
 }
 
-stmt_bop            = { bop ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)* }
-stmt_alloca         = {
-    "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)? ~ ("," ~ metadata_name ~ metadata_num)*
+// keywords
+
+sideeffect   = { "sideeffect" }
+alignstack   = { "alignstack" }
+inteldialect = { "inteldialect" }
+unwind       = { "unwind" }
+
+inbounds = { "inbounds" }
+inrange  = { "inrange" }
+
+weak = { "weak" }
+
+// enums
+
+atomicrmw_op = {
+    "xchg"
+  | "add"
+  | "sub"
+  | "and"
+  | "nand"
+  | "or"
+  | "xor"
+  | "max"
+  | "min"
+  | "umax"
+  | "umin"
+  | "fadd"
+  | "fsub"
+  | "fmax"
+  | "fmin"
+  | "uinc_wrap"
+  | "udec_wrap"
 }
-stmt_store_atomic   = {
-    "store" ~ "atomic" ~ volatile? ~ (fnty | ty) ~ val ~ "," ~ (fnty | ty) ~ val ~ ordering ~ align ~ ("," ~ named_meta)*
-}
-stmt_store          = {
-    // TODO: !nontemporal, !invariant.group
-    "store" ~ volatile? ~ (fnty | ty) ~ val ~ "," ~ (fnty | ty) ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
-}
-sideeffect          = { "sideeffect" }
-alignstack          = { "alignstack" }
-inteldialect        = { "inteldialect" }
-unwind              = { "unwind" }
-stmt_call_asm       = {
-    "call" ~ (fnty | ty) ~ "asm" ~ sideeffect? ~ alignstack? ~ inteldialect? ~ unwind? ~ string ~ "," ~ string ~ "(" ~ params ~ ")"* ~ ("," ~ named_meta)*
-}
-stmt_call           = {
-    tail? ~ "call" ~ (fast_math_flags ~ !"cc")? ~ cconv? ~ param_attrs ~ addr_space? ~ (fnty | ty) ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
-}
-inbounds            = { "inbounds" }
-inrange             = { "inrange" }
-stmt_gep_leg        = { "," ~ inrange? ~ ty ~ val }
-stmt_gep            = {
-    "getelementptr" ~ inbounds? ~ ty ~ "," ~ ty ~ val ~ stmt_gep_leg* ~ ("," ~ named_meta)*
-}
-stmt_load_atomic    = {
-    "load" ~ "atomic" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)*
-}
-stmt_load           = {
-    "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
-}
-stmt_ptrtoint       = {
-    "ptrtoint" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ metadata_name ~ metadata_num)*
-}
-stmt_sext           = {
-    "sext" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
-}
-cond                = {
+cond         = {
     "eq"
   | "ne"
   | "ugt"
@@ -359,10 +358,7 @@ cond                = {
   | "slt"
   | "sle"
 }
-stmt_icmp           = {
-    "icmp" ~ cond ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)*
-}
-fcond               = {
+fcond        = {
     "false"
   | "oeq"
   | "ogt"
@@ -380,12 +376,37 @@ fcond               = {
   | "uno"
   | "true"
 }
+
+stmt_alloca         = {
+    "alloca" ~ inalloca? ~ ty ~ (align | ("," ~ ty ~ val ~ align?))? ~ ("," ~ addr_space)? ~ ("," ~ metadata_name ~ metadata_num)*
+}
+stmt_atomicrmw      = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align? ~ ("," ~ named_meta)* }
+stmt_bitcast        = {
+    "bitcast" ~ (fnty | ty) ~ val ~ "to" ~ (fnty | ty) ~ ("," ~ named_meta)*
+}
+stmt_bop            = { bop ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)* }
+stmt_call_asm       = {
+    "call" ~ (fnty | ty) ~ "asm" ~ sideeffect? ~ alignstack? ~ inteldialect? ~ unwind? ~ string ~ "," ~ string ~ "(" ~ params ~ ")"* ~ ("," ~ named_meta)*
+}
+stmt_call           = {
+    tail? ~ "call" ~ (fast_math_flags ~ !"cc")? ~ cconv? ~ param_attrs ~ addr_space? ~ (fnty | ty) ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
+}
+stmt_cmpxchg        = { "cmpxchg" ~ weak? ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ordering ~ ordering ~ align? ~ ("," ~ named_meta)* }
+stmt_gep_leg        = { "," ~ inrange? ~ ty ~ val }
+stmt_gep            = {
+    "getelementptr" ~ inbounds? ~ ty ~ "," ~ ty ~ val ~ stmt_gep_leg* ~ ("," ~ named_meta)*
+}
+stmt_load_atomic    = {
+    "load" ~ "atomic" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ ordering ~ align ~ ("," ~ named_meta)*
+}
+stmt_load           = {
+    "load" ~ volatile? ~ ty ~ "," ~ ty ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
+}
+stmt_icmp           = {
+    "icmp" ~ cond ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)*
+}
 stmt_fcmp           = {
     "fcmp" ~ fast_math_flags* ~ fcond ~ ty ~ val ~ "," ~ val ~ ("," ~ named_meta)*
-}
-selty               = {
-    "i1"
-  | ("<" ~ uint ~ "x" ~ "i1" ~ ">")
 }
 stmt_select         = {
     "select" ~ fast_math_flags? ~ selty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ metadata_name ~ metadata_num)*
@@ -415,29 +436,9 @@ stmt_inttoptr       = {
 }
 stmt_phi_leg        = { "[" ~ val ~ "," ~ uid ~ "]" }
 stmt_phi            = { "phi" ~ fast_math_flags? ~ ty ~ stmt_phi_leg ~ ("," ~ stmt_phi_leg)* ~ ("," ~ named_meta)* }
-atomicrmw_op        = {
-    "xchg"
-  | "add"
-  | "sub"
-  | "and"
-  | "nand"
-  | "or"
-  | "xor"
-  | "max"
-  | "min"
-  | "umax"
-  | "umin"
-  | "fadd"
-  | "fsub"
-  | "fmax"
-  | "fmin"
-  | "uinc_wrap"
-  | "udec_wrap"
-}
-stmt_atomicrmw      = { "atomicrmw" ~ volatile? ~ atomicrmw_op ~ "ptr" ~ val ~ "," ~ ty ~ val ~ ordering ~ align? ~ ("," ~ named_meta)* }
 stmt_fence          = { "fence" ~ ordering ~ ("," ~ named_meta)* }
-stmt_bitcast        = {
-    "bitcast" ~ (fnty | ty) ~ val ~ "to" ~ (fnty | ty) ~ ("," ~ named_meta)*
+stmt_fptosi         = {
+    "fptosi" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
 stmt_extractelement = {
     "extractelement" ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ named_meta)*
@@ -451,42 +452,52 @@ stmt_sitofp         = {
 stmt_uitofp         = {
     "uitofp" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
 }
-stmt_fptosi         = {
-    "fptosi" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+stmt_ptrtoint       = {
+    "ptrtoint" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ metadata_name ~ metadata_num)*
 }
-weak                = { "weak" }
-stmt_cmpxchg        = { "cmpxchg" ~ weak? ~ volatile? ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ordering ~ ordering ~ align? ~ ("," ~ named_meta)* }
+stmt_sext           = {
+    "sext" ~ ty ~ val ~ "to" ~ ty ~ ("," ~ named_meta)*
+}
+stmt_store          = {
+    // TODO: !nontemporal, !invariant.group
+    "store" ~ volatile? ~ (fnty | ty) ~ val ~ "," ~ (fnty | ty) ~ val ~ align? ~ ("," ~ metadata_name ~ metadata_num)*
+}
+stmt_store_atomic   = {
+    "store" ~ "atomic" ~ volatile? ~ (fnty | ty) ~ val ~ "," ~ (fnty | ty) ~ val ~ ordering ~ align ~ ("," ~ named_meta)*
+}
+stmt_insertelement  = { "insertelement" ~ ty ~ val ~ "," ~ ty ~ val ~ "," ~ ty ~ val ~ ("," ~ named_meta)* }
 stmt_rhs            = {
-    stmt_bop
-  | stmt_alloca
-  | stmt_store_atomic
-  | stmt_store
-  | stmt_call_asm
-  | stmt_call
-  | stmt_gep
-  | stmt_load_atomic
-  | stmt_load
-  | stmt_ptrtoint
-  | stmt_icmp
-  | stmt_fcmp
-  | stmt_select
-  | stmt_insertvalue
-  | stmt_landingpad
-  | stmt_extractvalue
-  | stmt_trunc
-  | stmt_zext
-  | stmt_inttoptr
-  | stmt_phi
+    stmt_alloca
   | stmt_atomicrmw
-  | stmt_fence
   | stmt_bitcast
-  | stmt_sext
+  | stmt_bop
+  | stmt_call
+  | stmt_call_asm
+  | stmt_cmpxchg
   | stmt_extractelement
+  | stmt_extractvalue
+  | stmt_fcmp
+  | stmt_fence
+  | stmt_fptosi
+  | stmt_gep
+  | stmt_icmp
+  | stmt_insertelement
+  | stmt_insertvalue
+  | stmt_inttoptr
+  | stmt_landingpad
+  | stmt_load
+  | stmt_load_atomic
+  | stmt_phi
+  | stmt_ptrtoint
+  | stmt_select
+  | stmt_sext
   | stmt_shufflevector
   | stmt_sitofp
+  | stmt_store
+  | stmt_store_atomic
+  | stmt_trunc
   | stmt_uitofp
-  | stmt_fptosi
-  | stmt_cmpxchg
+  | stmt_zext
 }
 
 stmt = {
