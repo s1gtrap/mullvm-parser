@@ -548,7 +548,7 @@ attribute       = { (string | id) ~ ("=" ~ string | "(" ~ (attribute_field ~ (",
 attributes      = { "attributes" ~ attr_group ~ "=" ~ "{" ~ attribute* ~ "}" }
 
 declarg  = { ty ~ param_attrs }
-declargs = { (declarg ~ ("," ~ declarg)* ~ ("," ~ vararg)?)? }
+declargs = { ((declarg ~ ("," ~ declarg)* ~ ("," ~ vararg)?) | vararg)? }
 declare  = {
     "declare" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
 }

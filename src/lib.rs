@@ -2964,6 +2964,33 @@ fn test_parse_declaration() {
             //named_meta*: ???
         },
     );
+    assert_eq!(
+        Declaration::try_from(
+            LLVMParser::parse(
+                Rule::declare,
+                "declare i32 @rust_eh_personality(...) unnamed_addr #7",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Declaration {
+            linkage: None,
+            vis: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("i32".to_owned()),
+            name: Gid("rust_eh_personality".to_owned()),
+            args: vec![], // FIXME: should maybe note varargs?
+            addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            func_attrs: vec![],
+            //| attr_group)*
+            //personality: Option<Personality>,
+            //named_meta*: ???
+        },
+    );
 }
 
 #[derive(Debug, PartialEq)]
