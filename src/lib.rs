@@ -60,6 +60,7 @@ fn test_parse_module() {
                         ty: Type::Packed(vec![Type::Id("ptr".to_owned()),Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
                         name: Gid("alloc_0d59fa4b6ac8db87cb5ee133fbad49f4".to_owned()),
                         initializer_constant: None,
+                        section: None,
                         align: Some(8),
                         val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_d4049da30c3f108dbf45b257cd36e57e".to_owned())), ConstVal::String("L\\00\\00\\00\\00\\00\\00\\00\\B8\\0B\\00\\00\\0D\\00\\00\\00".to_owned())])),
                     },
@@ -78,6 +79,7 @@ fn test_parse_module() {
                         ty: Type::Packed(vec![Type::Id("ptr".to_owned()),Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
                         name: Gid("alloc_452aca60f8224f0cb24bfd27ed975a06".to_owned()),
                         initializer_constant: None,
+                        section: None,
                         align: Some(8),
                         val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_d4049da30c3f108dbf45b257cd36e57e".to_owned())), ConstVal::String("L\\00\\00\\00\\00\\00\\00\\00>\\08\\00\\00$\\00\\00\\00".to_owned())])),
                     },
@@ -2726,6 +2728,7 @@ pub struct Const {
     // section: String // TODO: impl
     // comdat: String // TODO: impl
     align: Option<usize>,
+    section: Option<String>,
     // metadata: TODO // TODO: impl
     val: Option<ConstVal>,
 }
@@ -2803,6 +2806,19 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             Some(p) => todo!("{p:?}"),
             None => None,
         };
+        let section = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::section => Some(
+                inner
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .next()
+                    .unwrap()
+                    .as_str()
+                    .to_owned(),
+            ),
+            _ => None,
+        };
         let align = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::align => Some(
                 inner
@@ -2831,6 +2847,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             ty,
             name,
             initializer_constant: None,
+            section,
             align,
             val,
         })
@@ -2861,6 +2878,7 @@ fn test_parse_ident_const() {
             ty: Type::Array(5, Box::new(Type::Id("i8".to_owned()))),
             name: Gid(".str".to_owned()),
             initializer_constant: None,
+            section: None,
             align: None,
             val: Some(ConstVal::String("Hello".to_owned())),
         },
@@ -2886,6 +2904,7 @@ fn test_parse_ident_const() {
             ty: Type::Array(4, Box::new(Type::Id("i8".to_owned()))),
             name: Gid(".str".to_owned()),
             initializer_constant: None,
+            section: None,
             align: None,
             val: Some(ConstVal::String("%d\\0A\\00".to_owned())),
         },
@@ -2911,8 +2930,9 @@ fn test_parse_ident_const() {
             ty: Type::Packed(vec![Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
             name: Gid("0".to_owned()),
             initializer_constant: None,
+            section: None,
             align: Some(8),
-                val: Some(ConstVal::Packed(vec![ConstVal::String("\\01\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00".to_owned())])),
+            val: Some(ConstVal::Packed(vec![ConstVal::String("\\01\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00\\00".to_owned())])),
         },
     );
     assert_eq!(
@@ -2936,6 +2956,7 @@ fn test_parse_ident_const() {
             ty: Type::Packed(vec![Type::Id("ptr".to_owned()), Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
             name: Gid("alloc_36df4256b240971941363a0ebb177d9e".to_owned()),
             initializer_constant: None,
+            section: None,
             align: Some(8),
             val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_94bbb66cf5550f46247d07c4155841ce".to_owned())), ConstVal::String("K\\00\\00\\00\\00\\00\\00\\00M\\01\\00\\00\\0D\\00\\00\\00".to_owned())])),
 
@@ -2962,9 +2983,9 @@ fn test_parse_ident_const() {
             ty: Type::Packed(vec![Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned()))), Type::Id("ptr".to_owned()), Type::Array(8, Box::new(Type::Id("i8".to_owned())))]),
             name: Gid("alloc_b58bc021c3e44cc3d3a416ce343bcc6c".to_owned()),
             initializer_constant: None,
+            section: None,
             align: Some(8),
-                val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_cc04218366297a9feed8b11aca7e8ec4".to_owned())), ConstVal::String("\\07\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_574d1a2219ebd7ae8db35e273d007636".to_owned())), ConstVal::String("\\08\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_081ab6102820eb6dbf606bc2a42bf682".to_owned())), ConstVal::String("\\08\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_1713fdbdd59e3f6dd78509f861b8bb36".to_owned())), ConstVal::String("\\04\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_228b951a53cd2b066a5833c8dc256a67".to_owned())), ConstVal::String("\\04\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_04111f00952c5e02df867bfba0bcedd9".to_owned())), ConstVal::String("\\0E\\00\\00\\00\\00\\00\\00\\00".to_owned())])),
-
+            val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_cc04218366297a9feed8b11aca7e8ec4".to_owned())), ConstVal::String("\\07\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_574d1a2219ebd7ae8db35e273d007636".to_owned())), ConstVal::String("\\08\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_081ab6102820eb6dbf606bc2a42bf682".to_owned())), ConstVal::String("\\08\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_1713fdbdd59e3f6dd78509f861b8bb36".to_owned())), ConstVal::String("\\04\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_228b951a53cd2b066a5833c8dc256a67".to_owned())), ConstVal::String("\\04\\00\\00\\00\\00\\00\\00\\00".to_owned()), ConstVal::Gid(Gid("alloc_04111f00952c5e02df867bfba0bcedd9".to_owned())), ConstVal::String("\\0E\\00\\00\\00\\00\\00\\00\\00".to_owned())])),
         },
     );
     assert_eq!(
@@ -2991,8 +3012,39 @@ fn test_parse_ident_const() {
             ty: Type::Id("i1".to_owned()),
             name: Gid(r#""Example::counter:init""#.to_owned()),
             initializer_constant: None,
+            section: None,
             align: None,
             val: Some(ConstVal::False),
+        },
+    );
+    assert_eq!(
+        Const::try_from(
+            LLVMParser::parse(
+                Rule::ident_const,
+                "@\"_ZN84_$LT$parking_lot..remutex..RawThreadId$u20$as$u20$lock_api..remutex..GetThreadId$GT$17nonzero_thread_id3KEY7__getit5__KEY17hc5b1914f15f62af3E\" = internal thread_local global <{ [1 x i8], [1 x i8], [1 x i8] }> <{ [1 x i8] zeroinitializer, [1 x i8] undef, [1 x i8] zeroinitializer }>, section \"__DATA,__thread_bss\", align 1, !dbg !151",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Const {
+            linkage: Some(Linkage::Internal),
+            preemp: None,
+            vis: None,
+            store: None,
+            thread_local: Some(ThreadLocal(None)),
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Packed(vec![Type::Array(1, Box::new(Type::Id("i8".to_owned()))), Type::Array(1, Box::new(Type::Id("i8".to_owned()))), Type::Array(1, Box::new(Type::Id("i8".to_owned())))]),
+            name: Gid(r#""_ZN84_$LT$parking_lot..remutex..RawThreadId$u20$as$u20$lock_api..remutex..GetThreadId$GT$17nonzero_thread_id3KEY7__getit5__KEY17hc5b1914f15f62af3E""#.to_owned()),
+            initializer_constant: None,
+            section: Some(r#""__DATA,__thread_bss""#.to_owned()),
+
+            align: Some(1),
+            val: Some(ConstVal::Packed(vec![ConstVal::Zinit, ConstVal::Undef, ConstVal::Zinit])),
         },
     );
 }
@@ -3364,6 +3416,7 @@ fn test_parse_definition() {
                 ty: Type::Packed(vec![Type::Id("ptr".to_owned()),Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
                 name: Gid("alloc_0d59fa4b6ac8db87cb5ee133fbad49f4".to_owned()),
                 initializer_constant: None,
+                section: None,
                 align: Some(8),
                 val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_d4049da30c3f108dbf45b257cd36e57e".to_owned())), ConstVal::String("L\\00\\00\\00\\00\\00\\00\\00\\B8\\0B\\00\\00\\0D\\00\\00\\00".to_owned())])),
             },
@@ -3391,6 +3444,7 @@ fn test_parse_definition() {
                 ty: Type::Packed(vec![Type::Id("ptr".to_owned()),Type::Array(16, Box::new(Type::Id("i8".to_owned())))]),
                 name: Gid("alloc_452aca60f8224f0cb24bfd27ed975a06".to_owned()),
                 initializer_constant: None,
+                section: None,
                 align: Some(8),
                 val: Some(ConstVal::Packed(vec![ConstVal::Gid(Gid("alloc_d4049da30c3f108dbf45b257cd36e57e".to_owned())), ConstVal::String("L\\00\\00\\00\\00\\00\\00\\00>\\08\\00\\00$\\00\\00\\00".to_owned())])),
 
@@ -3421,6 +3475,7 @@ fn test_parse_definition() {
             ty: Type::Id("i8".to_owned()),
             name: Gid("__rust_no_alloc_shim_is_unstable".to_owned()),
             initializer_constant: None,
+            section: None,
             align: None,
             val: None,
         }),
@@ -3449,6 +3504,7 @@ fn test_parse_definition() {
             ty: Type::Packed(vec![]),
             name: Gid("alloc_513570631223a12912d85da2bec3b15a".to_owned()),
             initializer_constant: None,
+            section: None,
             align: Some(8),
             val: Some(ConstVal::Zinit),
         }),
@@ -3477,6 +3533,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             ty: Type::Packed(vec![Type::Array(8, Box::new(Type::Id("i8".to_owned()))),Type::Array(8, Box::new(Type::Id("i8".to_owned())))]),
             name: Gid("1".to_owned()),
             initializer_constant: None,
+            section: None,
             align: Some(8),
             val: Some(ConstVal::Packed(vec![ConstVal::Zinit, ConstVal::Undef])),
         }),
@@ -3517,6 +3574,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             ty: Type::Ptr(Box::new(Type::Ptr(Box::new(Type::Id("i8".to_owned()))))),
             name: Gid("ARGV_UNSAFE".to_owned()),
             initializer_constant: None,
+            section: None,
             align: None,
             val: Some(ConstVal::Null),
         }),
@@ -3542,6 +3600,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             ty: Type::Struct(vec![Type::Id("i32".to_owned()), Type::Id("i32".to_owned()), Type::Id("i32".to_owned()), Type::Array(6, Box::new(Type::Id("i8".to_owned())))]),
             name: Gid("\"'Float'\"".to_owned()),
             initializer_constant: None,
+            section: None,
             align: None,
             val: Some(ConstVal::Struct(vec![
                 ConstVal::Int(1), ConstVal::Int(5), ConstVal::Int(5), ConstVal::String("Float\\00".to_owned()),
@@ -3619,6 +3678,7 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             initializer_constant: None,
             // section: String // TODO: impl
             // comdat: String // TODO: impl
+            section: None,
             align: None,
             // metadata: TODO // TODO: impl
             val: Some(ConstVal::Array(vec![ConstVal::ConstExpr(Box::new(ConstExpr::Bitcast(ConstVal::Gid(Gid("\"'skip'\"".to_owned())), Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))))])),

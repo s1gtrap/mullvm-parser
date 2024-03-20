@@ -551,8 +551,9 @@ thread_local = {
 ident_type  = {
     uid ~ "=" ~ "type" ~ ty
 }
+section     = { "section" ~ string }
 ident_const = {
-    gid ~ "=" ~ (linkage? ~ thread_local? ~ addr_attr? ~ const_attr ~ const_val_opt ~ align? ~ ("," ~ named_meta)*)
+    gid ~ "=" ~ (linkage? ~ thread_local? ~ addr_attr? ~ const_attr ~ const_val_opt ~ ("," ~ section)? ~ align? ~ ("," ~ named_meta)*)
 }
 
 distinct = { "distinct" }
