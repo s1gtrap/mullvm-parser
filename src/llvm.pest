@@ -218,6 +218,7 @@ add      = { "add" }
 and      = { "and" }
 ashr     = { "ashr" }
 disjoint = { "disjoint" }
+fadd     = { "fadd" }
 fdiv     = { "fdiv" }
 fmul     = { "fmul" }
 fsub     = { "fsub" }
@@ -240,7 +241,7 @@ bop = {
   | ((udiv | sdiv | lshr | ashr) ~ exact?)
   | (or ~ disjoint?)
   | (urem | srem | and | xor)
-  | ((fdiv | fmul | fsub) ~ fast_math_flags?)
+  | ((fadd | fdiv | fmul | fsub) ~ fast_math_flags?)
 }
 
 const_gep      = { "getelementptr" ~ inbounds? ~ "(" ~ ty ~ "," ~ const_val ~ ("," ~ const_val)+ ~ ")" }
