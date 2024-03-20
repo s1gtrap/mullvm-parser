@@ -135,7 +135,7 @@ pub enum Visibility {}
 pub enum DLLStorageClass {}
 
 #[derive(Debug, PartialEq)]
-pub enum CConv {
+pub enum Cconv {
     // “cc 11” // TODO: figure out how it's supposed to be tokenized
     // “cc <n>” // TODO: figure out how it's supposed to be tokenized
     Anyregcc,
@@ -649,6 +649,7 @@ pub enum Val {
     Int(i128),
     Null,
     Poison,
+    Vector(Vec<Val>),
     Struct(Vec<Val>),
     True,
     Uid(Uid),
@@ -686,6 +687,13 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                     Rule::val_null => Ok(Val::Null),
                     Rule::val_zinit => Ok(Val::Zinit),
                     Rule::val_struct => Ok(Val::Struct(
+                        pair.into_inner()
+                            .skip(1)
+                            .step_by(2)
+                            .map(Val::try_from)
+                            .collect::<Result<_, _>>()?,
+                    )),
+                    Rule::val_vector => Ok(Val::Vector(
                         pair.into_inner()
                             .skip(1)
                             .step_by(2)
@@ -1125,24 +1133,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for FastMathFlags {
             _ => unreachable!(),
         }
     }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Cconv {
-    Ccc,
-    Fastcc,
-    Coldcc,
-    Ghccc,
-    Cc11,
-    Anyregcc,
-    PreserveMostcc,
-    PreserveAllcc,
-    CxxFastTlscc,
-    Tailcc,
-    Swiftcc,
-    Swifttailcc,
-    CfguardCheckcc,
-    // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64. // TODO: impl
 }
 
 #[derive(Debug, PartialEq)]
@@ -2490,7 +2480,7 @@ pub struct Function {
     preemp: Option<Preemp>,
     vis: Option<Visibility>,
     store: Option<DLLStorageClass>,
-    cconv: Option<CConv>,
+    cconv: Option<Cconv>,
     ret_attrs: Vec<ParamAttr>,
     ret: Type,
     name: Gid,
@@ -2517,6 +2507,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
         let mut iterator = pair.into_inner();
         let linkage = match iterator.peek() {
             Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(iterator.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let cconv = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::cconv => {
                 Some(iterator.next().unwrap().try_into()?)
             }
             _ => None,
@@ -2607,7 +2603,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             preemp: None, // TODO: impl
             vis: None,    // TODO: impl
             store: None,  // TODO: impl
-            cconv: None,  // TODO: impl
+            cconv,
             ret_attrs,
             ret,
             name,
@@ -2846,13 +2842,13 @@ impl<'i> TryFrom<Pair<'i, Rule>> for IdentType {
 fn test_parse_ident_type() {
     assert_eq!(
         IdentType::try_from(
-            LLVMParser::parse(Rule::ident_type, r#"%Function = type { %"alloc::vec::Vec<ParamAttr>", %Gid, %"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>", %"alloc::vec::Vec<FuncAttr>", %"alloc::vec::Vec<Block>", %Type, %"core::option::Option<AddrSpace>", i8, i8, %"core::option::Option<Preemp>::None", %"core::option::Option<Visibility>::None", %"core::option::Option<DLLStorageClass>::None", %"core::option::Option<CConv>::None", [6 x i8] }"#)
+            LLVMParser::parse(Rule::ident_type, r#"%Function = type { %"alloc::vec::Vec<ParamAttr>", %Gid, %"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>", %"alloc::vec::Vec<FuncAttr>", %"alloc::vec::Vec<Block>", %Type, %"core::option::Option<AddrSpace>", i8, i8, %"core::option::Option<Preemp>::None", %"core::option::Option<Visibility>::None", %"core::option::Option<DLLStorageClass>::None", %"core::option::Option<Cconv>::None", [6 x i8] }"#)
                 .unwrap()
                 .next()
                 .unwrap(),
         )
         .unwrap(),
-        IdentType("Function".to_owned(), Type::Struct(vec![Type::Uid(Uid("\"alloc::vec::Vec<ParamAttr>\"".to_owned())), Type::Uid(Uid("Gid".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>\"".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<FuncAttr>\"".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<Block>\"".to_owned())), Type::Uid(Uid("Type".to_owned())), Type::Uid(Uid("\"core::option::Option<AddrSpace>\"".to_owned())), Type::Id("i8".to_owned()), Type::Id("i8".to_owned()), Type::Uid(Uid("\"core::option::Option<Preemp>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<Visibility>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<DLLStorageClass>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<CConv>::None\"".to_owned())), Type::Array(6, Box::new(Type::Id("i8".to_owned())))])),
+        IdentType("Function".to_owned(), Type::Struct(vec![Type::Uid(Uid("\"alloc::vec::Vec<ParamAttr>\"".to_owned())), Type::Uid(Uid("Gid".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<(Type, alloc::vec::Vec<ParamAttr>, Uid)>\"".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<FuncAttr>\"".to_owned())), Type::Uid(Uid("\"alloc::vec::Vec<Block>\"".to_owned())), Type::Uid(Uid("Type".to_owned())), Type::Uid(Uid("\"core::option::Option<AddrSpace>\"".to_owned())), Type::Id("i8".to_owned()), Type::Id("i8".to_owned()), Type::Uid(Uid("\"core::option::Option<Preemp>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<Visibility>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<DLLStorageClass>::None\"".to_owned())), Type::Uid(Uid("\"core::option::Option<Cconv>::None\"".to_owned())), Type::Array(6, Box::new(Type::Id("i8".to_owned())))])),
     );
     assert_eq!(
         IdentType::try_from(
@@ -3324,7 +3320,6 @@ fn test_parse_ident_const() {
             name: Gid(r#""_ZN84_$LT$parking_lot..remutex..RawThreadId$u20$as$u20$lock_api..remutex..GetThreadId$GT$17nonzero_thread_id3KEY7__getit5__KEY17hc5b1914f15f62af3E""#.to_owned()),
             initializer_constant: None,
             section: Some(r#""__DATA,__thread_bss""#.to_owned()),
-
             align: Some(1),
             val: Some(ConstVal::Packed(vec![ConstVal::Zinit, ConstVal::Undef, ConstVal::Zinit])),
         },
