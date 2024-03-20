@@ -727,6 +727,17 @@ fn test_parse_val() {
     //     .unwrap(),
     //     Val::Float(f64::MIN),
     // );
+    assert_eq!(
+        // FIXME: parses as -inf
+        Val::try_from(
+            LLVMParser::parse(Rule::val, "-0.000000e+00")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Val::Float(-0.0),
+    );
 }
 
 #[derive(Debug, PartialEq)]
