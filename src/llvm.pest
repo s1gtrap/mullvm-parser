@@ -494,11 +494,12 @@ function = {
     "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ fn_align? ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
-const_val_opt =  { (fnty | ty) ~ ((const_zinit | const_undef | const_str | const_struct | const_packed | const_null | const_false | const_true | const_expr | gid | int) ~ !"=")? }
-const_val     =  { (fnty | ty) ~ (const_zinit | const_undef | const_str | const_struct | const_packed | const_null | const_false | const_true | const_expr | gid | int) }
+const_val_opt =  { (fnty | ty) ~ ((const_zinit | const_undef | const_str | const_array | const_struct | const_packed | const_null | const_false | const_true | const_expr | gid | int) ~ !"=")? }
+const_val     =  { (fnty | ty) ~ (const_zinit | const_undef | const_str | const_array | const_struct | const_packed | const_null | const_false | const_true | const_expr | gid | int) }
 const_zinit   =  { "zeroinitializer" }
 const_undef   =  { "undef" }
 const_str     = @{ "c" ~ string }
+const_array   =  { "[" ~ (const_val ~ (", " ~ const_val)*)? ~ "]" }
 const_struct  =  { "{" ~ (const_val ~ (", " ~ const_val)*)? ~ "}" }
 const_packed  =  { "<{" ~ (const_val ~ (", " ~ const_val)*)? ~ "}>" }
 const_null    =  { "null" }

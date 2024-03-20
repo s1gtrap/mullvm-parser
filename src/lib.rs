@@ -2499,7 +2499,7 @@ pub enum ConstVal {
     String(String),
     Int(i128),
     Gid(Gid),
-    //Array(usize, Box<ConstVal>),
+    Array(Vec<ConstVal>),
     Struct(Vec<ConstVal>),
     Packed(Vec<ConstVal>),
     Zinit,
@@ -2600,6 +2600,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
                     .next()
                     .unwrap();
                 Some(ConstVal::String(str_inner.as_str().to_owned()))
+            }
+            Some(val) if val.as_rule() == Rule::const_array => {
+                let inner = val.into_inner();
+                Some(ConstVal::Array(
+                    inner.map(|p| p.try_into()).collect::<Result<_, _>>()?,
+                ))
             }
             Some(val) if val.as_rule() == Rule::const_struct => {
                 let inner = val.into_inner();
@@ -3346,5 +3352,33 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
                 ),
             ),
         ),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, "@\":symbol_table\" = global [1 x %String*] [%String* bitcast ({ i32, i32, i32, [5 x i8] }* @\"'skip'\" to %String*)]")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: None,
+            preemp: None,
+            vis: None,
+            store: None,
+            thread_local: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Array(1, Box::new(Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))),
+            name: Gid("\":symbol_table\"".to_owned()),
+            initializer_constant: None,
+            // section: String // TODO: impl
+            // comdat: String // TODO: impl
+            align: None,
+            // metadata: TODO // TODO: impl
+            val: Some(ConstVal::Array(vec![ConstVal::ConstExpr(Box::new(ConstExpr::Bitcast(ConstVal::Gid(Gid("\"'skip'\"".to_owned())), Type::Ptr(Box::new(Type::Uid(Uid("String".to_owned())))))))])),
+        }),
     );
 }
