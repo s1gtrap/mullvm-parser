@@ -44,11 +44,11 @@ linkage = {
 }
 
 cconv = {
-    "ccc"
-  | "fastcc"
+    "fastcc"
+  | "ccc"
   | "coldcc"
-  | "ghccc"
-  | "cc 11"
+  | "ghccc" // | "cc 11" // TODO: figure out how it's supposed to be tokenized
+
   | "anyregcc"
   | "preserve_mostcc"
   | "preserve_allcc"
@@ -326,7 +326,7 @@ stmt_call_asm       = {
     "call" ~ (fnty | ty) ~ "asm" ~ sideeffect? ~ alignstack? ~ inteldialect? ~ unwind? ~ string ~ "," ~ string ~ "(" ~ params ~ ")"* ~ ("," ~ named_meta)*
 }
 stmt_call           = {
-    tail? ~ "call" ~ fast_math_flags? ~ cconv? ~ param_attrs ~ addr_space? ~ (fnty | ty) ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
+    tail? ~ "call" ~ (fast_math_flags ~ !"cc")? ~ cconv? ~ param_attrs ~ addr_space? ~ (fnty | ty) ~ val ~ "(" ~ params ~ ")" ~ (func_attr | attr_group)* ~ ("," ~ metadata_name ~ metadata_num)*
 }
 inbounds            = { "inbounds" }
 inrange             = { "inrange" }

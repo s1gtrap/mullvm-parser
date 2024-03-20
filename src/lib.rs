@@ -135,7 +135,45 @@ pub enum Visibility {}
 pub enum DLLStorageClass {}
 
 #[derive(Debug, PartialEq)]
-pub enum CConv {}
+pub enum CConv {
+    // “cc 11” // TODO: figure out how it's supposed to be tokenized
+    // “cc <n>” // TODO: figure out how it's supposed to be tokenized
+    Anyregcc,
+    Ccc,
+    CfguardCheckcc,
+    Coldcc,
+    CxxFastTlscc,
+    Fastcc,
+    Ghccc,
+    PreserveAllcc,
+    PreserveMostcc,
+    PreserveNonecc,
+    Swiftcc,
+    Swifttailcc,
+    Tailcc,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Cconv {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        Ok(match pair.as_str() {
+            "anyregcc" => Cconv::Anyregcc,
+            "ccc" => Cconv::Ccc,
+            "cfguard_checkcc" => Cconv::CfguardCheckcc,
+            "coldcc" => Cconv::Coldcc,
+            "cxx_fast_tlscc" => Cconv::CxxFastTlscc,
+            "fastcc" => Cconv::Fastcc,
+            "ghccc" => Cconv::Ghccc,
+            "preserve_allcc" => Cconv::PreserveAllcc,
+            "preserve_mostcc" => Cconv::PreserveMostcc,
+            "swiftcc" => Cconv::Swiftcc,
+            "swifttailcc" => Cconv::Swifttailcc,
+            "tailcc" => Cconv::Tailcc,
+            _ => unreachable!(),
+        })
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Type {
@@ -1169,6 +1207,10 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
             }
             _ => None,
         };
+        let cconv = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::cconv => Some(inner.next().unwrap().try_into()?),
+            _ => None,
+        };
         let ret_attrs = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::param_attrs => inner
                 .next()
@@ -1189,7 +1231,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
         Ok(Call {
             tail,
             fast_math_flags,
-            cconv: None, // TODO: impl
+            cconv,
             ret_attrs,
             addrspace: None, // TODO: impl
             ty,
@@ -1199,6 +1241,43 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Call {
                               // [ operand bundles ] // TODO: impl
         })
     }
+}
+
+#[test]
+fn test_parse_call_stmt() {
+    use pest::Parser;
+    assert_eq!(
+        Call::try_from(
+            LLVMParser::parse(Rule::stmt_call, r#"call fastcc void @"_ZN74_$LT$regex_automata..meta..regex..Config$u20$as$u20$core..clone..Clone$GT$5clone17hd4c18da2faf086c3E"(ptr noalias nocapture noundef nonnull align 8 dereferenceable(128) %config.i, ptr noalias noundef nonnull readonly align 8 dereferenceable(128) %self), !dbg !3420, !noalias !3421"#)
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Call {
+            tail: None,
+            fast_math_flags: None,
+            cconv: Some(Cconv::Fastcc),
+            ret_attrs: vec![],
+            addrspace: None, // TODO: impl
+            ty: Type::Id("void".to_owned()),
+            val: Val::Gid(Gid(r#""_ZN74_$LT$regex_automata..meta..regex..Config$u20$as$u20$core..clone..Clone$GT$5clone17hd4c18da2faf086c3E""#.to_owned())),
+            args: vec![
+                Param::Param(
+                    Type::Id("ptr".to_owned()), 
+                    vec![ParamAttr::Noalias, ParamAttr::Nocapture, ParamAttr::Noundef, ParamAttr::Nonnull, ParamAttr::Align(8), ParamAttr::Dereferenceable(128)],
+                    Val::Uid(Uid("config.i".to_owned())),
+                ),
+                Param::Param(
+                    Type::Id("ptr".to_owned()), 
+                    vec![ParamAttr::Noalias, ParamAttr::Noundef, ParamAttr::Nonnull, ParamAttr::Readonly, ParamAttr::Align(8), ParamAttr::Dereferenceable(128)],
+                    Val::Uid(Uid("self".to_owned())),
+                ),
+            ],
+            fn_attrs: vec![], // TODO: impl
+                              // [ operand bundles ] // TODO: impl
+        },
+    );
 }
 
 #[derive(Debug, PartialEq)]
