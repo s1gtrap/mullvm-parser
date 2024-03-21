@@ -129,7 +129,24 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Linkage {
 pub enum Preemp {}
 
 #[derive(Debug, PartialEq)]
-pub enum Visibility {}
+pub enum Visibility {
+    Default,
+    Hidden,
+    Protected,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Visibility {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        Ok(match pair.as_str() {
+            "default" => Visibility::Default,
+            "hidden" => Visibility::Hidden,
+            "protected" => Visibility::Protected,
+            _ => unreachable!(),
+        })
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum DLLStorageClass {}
@@ -2617,6 +2634,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             }
             _ => None,
         };
+        let vis = match iterator.peek() {
+            Some(pair) if pair.as_rule() == Rule::visibility => {
+                Some(iterator.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
         let cconv = match iterator.peek() {
             Some(pair) if pair.as_rule() == Rule::cconv => {
                 Some(iterator.next().unwrap().try_into()?)
@@ -2707,8 +2730,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
         Ok(Function {
             linkage,
             preemp: None, // TODO: impl
-            vis: None,    // TODO: impl
-            store: None,  // TODO: impl
+            vis,
+            store: None, // TODO: impl
             cconv,
             ret_attrs,
             ret,
@@ -2879,6 +2902,36 @@ fn test_parse_function() {
                 ),
             ],
             addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            align: None,
+            // FIXME: parse personality
+            blocks: vec![Block {
+                label: None,
+                insns: vec![],
+                term: Term::Ret(Type::Id("void".to_owned()), None),
+            }],
+        }
+    );
+    assert_eq!(
+        Function::try_from(
+            LLVMParser::parse(Rule::function, "define hidden void @_ZN6probe45probe17h191a10503931ad33E() unnamed_addr #0 { ret void }")
+            .unwrap()
+            .next()
+            .unwrap()
+        )
+        .unwrap(),
+        Function {
+            linkage: None,
+            preemp: None,
+            vis: Some(Visibility::Hidden),
+            store: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("void".to_owned()),
+            name: Gid("_ZN6probe45probe17h191a10503931ad33E".to_owned()),
+            args: vec![],
+            addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             func_attrs: vec![],
             align: None,

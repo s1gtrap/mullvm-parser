@@ -59,6 +59,12 @@ cconv = {
   | "cfguard_checkcc" // | "cc <n>" // TODO: Any calling convention may be specified by number, allowing target-specific calling conventions to be used. Target specific calling conventions start at 64.
 }
 
+visibility = {
+    "default"
+  | "hidden"
+  | "protected"
+}
+
 vararg = { "..." }
 fnty   = { ty ~ "(" ~ (ty ~ ("," ~ ty)* ~ ("," ~ vararg)? | vararg)? ~ ")" ~ star* }
 selty  = {
@@ -552,7 +558,7 @@ personality = { "personality" ~ (fnty | ty) ~ gid }
 
 fn_align = { "align" ~ uint }
 function = {
-    "define" ~ linkage? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ fn_align? ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
+    "define" ~ linkage? ~ visibility? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ fn_align? ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
 const_val_opt =  { (fnty | ty) ~ ((const_zinit | const_undef | const_str | const_array | const_struct | const_packed | const_null | const_false | const_true | const_expr | gid | int) ~ !"=")? }
