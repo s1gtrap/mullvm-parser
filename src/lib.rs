@@ -2627,27 +2627,25 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
     type Error = pest::error::Error<Rule>;
 
     fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
-        let mut iterator = pair.into_inner();
-        let linkage = match iterator.peek() {
+        let mut inner = pair.into_inner();
+        let linkage = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::linkage => {
-                Some(iterator.next().unwrap().try_into()?)
+                Some(inner.next().unwrap().try_into()?)
             }
             _ => None,
         };
-        let vis = match iterator.peek() {
+        let vis = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::visibility => {
-                Some(iterator.next().unwrap().try_into()?)
+                Some(inner.next().unwrap().try_into()?)
             }
             _ => None,
         };
-        let cconv = match iterator.peek() {
-            Some(pair) if pair.as_rule() == Rule::cconv => {
-                Some(iterator.next().unwrap().try_into()?)
-            }
+        let cconv = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::cconv => Some(inner.next().unwrap().try_into()?),
             _ => None,
         };
-        let ret_attrs = match iterator.peek() {
-            Some(pair) if pair.as_rule() == Rule::param_attrs => iterator
+        let ret_attrs = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::param_attrs => inner
                 .next()
                 .unwrap()
                 .into_inner()
@@ -2655,17 +2653,17 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
                 .collect::<Result<_, _>>()?,
             _ => vec![],
         };
-        let ret = match iterator.peek() {
-            Some(pair) if pair.as_rule() == Rule::ty => iterator.next().unwrap().try_into()?,
+        let ret = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::ty => inner.next().unwrap().try_into()?,
             p => unreachable!("{p:?}"),
         };
-        let name = match iterator.peek() {
-            Some(pair) if pair.as_rule() == Rule::gid => iterator.next().unwrap().try_into()?,
+        let name = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::gid => inner.next().unwrap().try_into()?,
             _ => unreachable!(),
         };
-        let args = match iterator.peek() {
+        let args = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::arguments => {
-                let inner = iterator.next().unwrap().into_inner();
+                let inner = inner.next().unwrap().into_inner();
                 inner
                     .map(|p| {
                         let mut inner = p.into_inner();
@@ -2687,32 +2685,32 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             }
             _ => unreachable!(),
         }?;
-        let addr_attr = match iterator.peek() {
+        let addr_attr = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::addr_attr => {
-                Some(iterator.next().unwrap().try_into()?)
+                Some(inner.next().unwrap().try_into()?)
             }
             _ => None,
         };
-        let addr_space = match iterator.peek() {
+        let addr_space = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::addr_space => {
                 None // TODO: impl
             }
             _ => None,
         };
         loop {
-            if iterator.peek().unwrap().as_rule() == Rule::func_attr
-                || iterator.peek().unwrap().as_rule() == Rule::attr_group
-                || iterator.peek().unwrap().as_rule() == Rule::personality
-                || iterator.peek().unwrap().as_rule() == Rule::named_meta
+            if inner.peek().unwrap().as_rule() == Rule::func_attr
+                || inner.peek().unwrap().as_rule() == Rule::attr_group
+                || inner.peek().unwrap().as_rule() == Rule::personality
+                || inner.peek().unwrap().as_rule() == Rule::named_meta
             {
-                iterator.next().unwrap();
+                inner.next().unwrap();
             } else {
                 break;
             }
         }
-        let align = match iterator.peek() {
+        let align = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::fn_align => Some(
-                iterator
+                inner
                     .next()
                     .unwrap()
                     .into_inner()
@@ -2724,9 +2722,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             ),
             _ => None,
         };
-        let blocks = iterator
-            .map(Block::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
+        let blocks = inner.map(Block::try_from).collect::<Result<Vec<_>, _>>()?;
         Ok(Function {
             linkage,
             preemp: None, // TODO: impl
