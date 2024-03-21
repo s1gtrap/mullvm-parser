@@ -2649,6 +2649,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
             }
             _ => None,
         };
+        let preemp = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::preempt => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
         let vis = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::visibility => {
                 Some(inner.next().unwrap().try_into()?)
@@ -2740,7 +2746,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Function {
         let blocks = inner.map(Block::try_from).collect::<Result<Vec<_>, _>>()?;
         Ok(Function {
             linkage,
-            preemp: None, // TODO: impl
+            preemp,
             vis,
             store: None, // TODO: impl
             cconv,
@@ -2943,6 +2949,43 @@ fn test_parse_function() {
             name: Gid("_ZN6probe45probe17h191a10503931ad33E".to_owned()),
             args: vec![],
             addr_attr: Some(AddrAttr::UnnamedAddr),
+            addr_space: None,
+            func_attrs: vec![],
+            align: None,
+            // FIXME: parse personality
+            blocks: vec![Block {
+                label: None,
+                insns: vec![],
+                term: Term::Ret(Type::Id("void".to_owned()), None),
+            }],
+        }
+    );
+    assert_eq!(
+        Function::try_from(
+            LLVMParser::parse(
+                Rule::function,
+                "define dso_local void @destructor(i8* %0) { ret void }",
+            )
+            .unwrap()
+            .next()
+            .unwrap()
+        )
+        .unwrap(),
+        Function {
+            linkage: None,
+            preemp: Some(Preemp::DsoLocal),
+            vis: None,
+            store: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("void".to_owned()),
+            name: Gid("destructor".to_owned()),
+            args: vec![(
+                Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                vec![],
+                Some(Uid("0".to_owned())),
+            )],
+            addr_attr: None,
             addr_space: None,
             func_attrs: vec![],
             align: None,

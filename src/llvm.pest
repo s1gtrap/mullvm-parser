@@ -563,7 +563,7 @@ personality = { "personality" ~ (fnty | ty) ~ gid }
 
 fn_align = { "align" ~ uint }
 function = {
-    "define" ~ linkage? ~ visibility? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ fn_align? ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
+    "define" ~ linkage? ~ preempt? ~ visibility? ~ cconv? ~ param_attrs ~ ty ~ gid ~ "(" ~ arguments ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ fn_align? ~ personality? ~ named_meta* ~ "{" ~ block+ ~ "}"
 }
 
 const_val_opt =  { (fnty | ty) ~ ((const_zinit | const_undef | const_str | const_array | const_struct | const_packed | const_null | const_false | const_true | const_expr | gid | int) ~ !"=")? }
