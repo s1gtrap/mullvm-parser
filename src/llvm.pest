@@ -11,7 +11,7 @@ float_base = @{ "-"? ~ int ~ "." ~ ASCII_DIGIT+ }
 float_exp  = @{ "e" ~ ("+" | "-") ~ ASCII_DIGIT+ }
 float      = ${ float_base ~ float_exp? }
 
-idchar = @{ ASCII_ALPHANUMERIC | "_" | "." | "-" }
+idchar = @{ ASCII_ALPHANUMERIC | "_" | "." | "-" | "$" }
 id     = @{ !vararg ~ idchar+ }
 uid    = @{ "%" ~ (string | id) }
 gid    = @{ "@" ~ (string | id) }

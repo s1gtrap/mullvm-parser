@@ -227,7 +227,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Type {
                 Ok(ty)
             }
             Rule::fnty => {
-                println!("{pair:?}");
                 let mut inner = pair.into_inner();
                 let ret = inner.next().unwrap().try_into()?;
                 let mut args = vec![];
@@ -667,7 +666,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Val {
                 let pair = inner.next().unwrap();
                 match pair.as_rule() {
                     Rule::float => {
-                        println!("{pair:?}");
                         let mut inner = pair.into_inner();
                         let base: f64 = inner.next().unwrap().as_str().parse().unwrap();
                         let exp =
@@ -1464,7 +1462,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Gep {
         let indices = inner
             .take_while(|p| p.as_rule() == Rule::stmt_gep_leg)
             .map(|pair| {
-                println!("{pair:?}");
                 let mut inner = pair.into_inner();
                 let inrange = if inner.peek().unwrap().as_rule() == Rule::inrange {
                     inner.next().unwrap();
@@ -2969,6 +2966,26 @@ fn test_parse_ident_type() {
         .unwrap(),
         IdentType(r#""{closure@<core::result::Result<alloc::vec::Vec<Block>, pest::error::Error<Rule>> as core::iter::traits::collect::FromIterator<core::result::Result<Block, pest::error::Error<Rule>>>>::from_iter<core::iter::adapters::map::Map<pest::iterators::pairs::Pairs<'_, Rule>, fn(pest::iterators::pair::Pair<'_, Rule>) -> core::result::Result<Block, <Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::Error> {<Block as core::convert::TryFrom<pest::iterators::pair::Pair<'_, Rule>>>::try_from}>>::{closure#0}}""#.to_owned(), Type::Struct(vec![])),
     );
+    assert_eq!(
+        IdentType::try_from(
+            LLVMParser::parse(
+                Rule::ident_type,
+                "%$locals_tigermain = type { i8*, i64, i64 }"
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        IdentType(
+            "$locals_tigermain".to_owned(),
+            Type::Struct(vec![
+                Type::Ptr(Box::new(Type::Id("i8".to_owned()))),
+                Type::Id("i64".to_owned()),
+                Type::Id("i64".to_owned()),
+            ]),
+        ),
+    );
 }
 
 #[derive(Debug, PartialEq)]
@@ -3489,7 +3506,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
                 inner
                     .take_while(|p| p.as_rule() == Rule::declarg)
                     .map(|p| {
-                        println!("{p:?}");
                         let mut inner = p.into_inner();
                         let ty = Type::try_from(inner.next().unwrap())?;
                         let attrs = if inner.peek().unwrap().as_rule() == Rule::param_attrs {
@@ -3508,7 +3524,6 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
             }
             _ => unreachable!(),
         }?;
-        println!("{args:?}");
         let addr_attr = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::addr_attr => {
                 Some(inner.next().unwrap().try_into()?)
