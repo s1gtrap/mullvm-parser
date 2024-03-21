@@ -126,7 +126,22 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Linkage {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Preemp {}
+pub enum Preemp {
+    DsoPreemptable,
+    DsoLocal,
+}
+
+impl<'i> TryFrom<Pair<'i, Rule>> for Preemp {
+    type Error = pest::error::Error<Rule>;
+
+    fn try_from(pair: Pair<'i, Rule>) -> Result<Self, Self::Error> {
+        Ok(match pair.as_str() {
+            "dso_preemptable" => Preemp::DsoPreemptable,
+            "dso_local" => Preemp::DsoLocal,
+            _ => unreachable!(),
+        })
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Visibility {
@@ -3504,6 +3519,7 @@ fn test_parse_ident_const() {
 #[derive(Debug, PartialEq)]
 pub struct Declaration {
     linkage: Option<Linkage>,
+    preemp: Option<Preemp>, // FIXME: why isn't this mentioned in docs?
     vis: Option<Visibility>,
     cconv: Option<Cconv>,
     ret_attrs: Vec<ParamAttr>,
@@ -3526,6 +3542,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
         let mut inner = pair.into_inner();
         let linkage = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::linkage => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let preemp = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::preempt => {
                 Some(inner.next().unwrap().try_into()?)
             }
             _ => None,
@@ -3604,6 +3626,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
         }*/
         Ok(Declaration {
             linkage,
+            preemp,
             vis,
             cconv: None, // TODO: impl
             ret_attrs,
@@ -3639,6 +3662,7 @@ fn test_parse_declaration() {
         .unwrap(),
         Declaration {
             linkage: None,
+            preemp: None,
             vis: None,
             cconv: None,
             ret_attrs: vec![ParamAttr::Noalias],
@@ -3666,6 +3690,7 @@ fn test_parse_declaration() {
         .unwrap(),
         Declaration {
             linkage: None,
+            preemp: None,
             vis: None,
             cconv: None,
             ret_attrs: vec![],
@@ -3693,6 +3718,7 @@ fn test_parse_declaration() {
         .unwrap(),
         Declaration {
             linkage: None,
+            preemp: None,
             vis: None,
             cconv: None,
             ret_attrs: vec![],
@@ -3730,6 +3756,7 @@ fn test_parse_declaration() {
         .unwrap(),
         Declaration {
             linkage: None,
+            preemp: None,
             vis: None,
             cconv: None,
             ret_attrs: vec![],
@@ -3748,7 +3775,6 @@ fn test_parse_declaration() {
             //named_meta*: ???
         },
     );
-
     assert_eq!(
         Declaration::try_from(
             LLVMParser::parse(
@@ -3762,6 +3788,7 @@ fn test_parse_declaration() {
         .unwrap(),
         Declaration {
             linkage: None,
+            preemp: None,
             vis: Some(Visibility::Hidden),
             cconv: None,
             ret_attrs: vec![],
@@ -3772,6 +3799,38 @@ fn test_parse_declaration() {
                 (Type::Id("i1".to_owned()), vec![]),
             ],
             addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            //| attr_group)*
+            //personality: Option<Personality>,
+            //named_meta*: ???
+        },
+    );
+    assert_eq!(
+        Declaration::try_from(
+            LLVMParser::parse(
+                Rule::declare,
+                "declare dso_local void @_ZN4core9panicking5panic17hc6e83cc3a3b6aa12E(ptr align 1, i32, ptr align 4) unnamed_addr #2",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Declaration {
+            linkage: None,
+            preemp: Some(Preemp::DsoLocal),
+            vis: None,
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("void".to_owned()),
+            name: Gid("_ZN4core9panicking5panic17hc6e83cc3a3b6aa12E".to_owned()),
+            args: vec![
+                (Type::Id("ptr".to_owned()), vec![ParamAttr::Align(1)]),
+                (Type::Id("i32".to_owned()), vec![]),
+                (Type::Id("ptr".to_owned()), vec![ParamAttr::Align(4)]),
+            ],
+            addr_attr: Some(AddrAttr::UnnamedAddr),
             addr_space: None,
             func_attrs: vec![],
             //| attr_group)*
