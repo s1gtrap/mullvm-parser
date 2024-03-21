@@ -3213,6 +3213,18 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
             }
             _ => None,
         };
+        let preemp = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::preempt => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
+        let vis = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::visibility => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
         let thread_local = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::thread_local => {
                 Some(inner.next().unwrap().try_into()?)
@@ -3304,8 +3316,8 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Const {
         // TODO: named meta
         Ok(Const {
             linkage,
-            preemp: None,
-            vis: None,
+            preemp,
+            vis,
             store: None,
             thread_local,
             addr_attr,
@@ -4061,7 +4073,7 @@ fn test_parse_definition() {
         Definition::try_from(
             LLVMParser::parse(
                 Rule::definition,
-r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroinitializer, [8 x i8] undef }>, align 8"#
+                r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroinitializer, [8 x i8] undef }>, align 8"#
             )
             .unwrap()
             .next()
@@ -4254,6 +4266,67 @@ r#"@1 = private unnamed_addr constant <{ [8 x i8], [8 x i8] }> <{ [8 x i8] zeroi
             ty: Type::Fn(Box::new(Type::Id("i1".to_owned())), vec![Type::Id("ptr".to_owned()), Type::Id("ptr".to_owned())], false),
             pty: Type::Id("ptr".to_owned()),
             val: Gid(r#""_ZN65_$LT$regex..regex..bytes..Regex$u20$as$u20$core..fmt..Display$GT$3fmt17h0f5546db75e83286E""#.to_owned()),
+        }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(
+                Rule::definition,
+                "@__dso_handle = external hidden global i8",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: Some(Linkage::External),
+            preemp: None,
+            vis: Some(Visibility::Hidden),
+            store: None,
+            thread_local: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Id("i8".to_owned()),
+            name: Gid("__dso_handle".to_owned()),
+            initializer_constant: None,
+            // section: String // TODO: impl
+            // comdat: String // TODO: impl
+            section: None,
+            align: None,
+            // metadata: TODO // TODO: impl
+            val: None,
+        }),
+    );
+    assert_eq!(
+        Definition::try_from(
+            LLVMParser::parse(Rule::definition, "@zzz = external dso_local global i64")
+                .unwrap()
+                .next()
+                .unwrap(),
+        )
+        .unwrap(),
+        Definition::Const(Const {
+            linkage: Some(Linkage::External),
+            preemp: Some(Preemp::DsoLocal),
+            vis: None,
+            store: None,
+            thread_local: None,
+            addr_attr: None,
+            addr_space: None,
+            externally_initialized: None,
+            const_attr: ConstAttr::Global,
+            ty: Type::Id("i64".to_owned()),
+            name: Gid("zzz".to_owned()),
+            initializer_constant: None,
+            // section: String // TODO: impl
+            // comdat: String // TODO: impl
+            section: None,
+            align: None,
+            // metadata: TODO // TODO: impl
+            val: None,
         }),
     );
 }

@@ -592,7 +592,7 @@ ident_type  = {
 }
 section     = { "section" ~ string }
 ident_const = {
-    gid ~ "=" ~ (linkage? ~ thread_local? ~ addr_attr? ~ const_attr ~ const_val_opt ~ ("," ~ section)? ~ align? ~ ("," ~ named_meta)*)
+    gid ~ "=" ~ (linkage? ~ preempt? ~ visibility? ~ thread_local? ~ addr_attr? ~ const_attr ~ const_val_opt ~ ("," ~ section)? ~ align? ~ ("," ~ named_meta)*)
 }
 
 distinct = { "distinct" }
