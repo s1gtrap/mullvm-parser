@@ -619,7 +619,7 @@ attributes      = { "attributes" ~ attr_group ~ "=" ~ "{" ~ attribute* ~ "}" }
 declarg  = { (fnty | ty) ~ param_attrs }
 declargs = { ((declarg ~ ("," ~ declarg)* ~ ("," ~ vararg)?) | vararg)? }
 declare  = {
-    "declare" ~ linkage? ~ cconv? ~ param_attrs ~ (fnty | ty) ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
+    "declare" ~ linkage? ~ visibility? ~ cconv? ~ param_attrs ~ (fnty | ty) ~ gid ~ "(" ~ declargs ~ ")" ~ addr_attr? ~ addr_space? ~ (func_attr | attr_group)* ~ personality? ~ named_meta*
 }
 
 alias = {

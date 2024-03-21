@@ -3534,6 +3534,12 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
             }
             _ => None,
         };
+        let vis = match inner.peek() {
+            Some(pair) if pair.as_rule() == Rule::visibility => {
+                Some(inner.next().unwrap().try_into()?)
+            }
+            _ => None,
+        };
         let ret_attrs = match inner.peek() {
             Some(pair) if pair.as_rule() == Rule::param_attrs => inner
                 .next()
@@ -3602,7 +3608,7 @@ impl<'i> TryFrom<Pair<'i, Rule>> for Declaration {
         }*/
         Ok(Declaration {
             linkage,
-            vis: None,   // TODO: impl
+            vis,
             cconv: None, // TODO: impl
             ret_attrs,
             ret,
@@ -3738,6 +3744,37 @@ fn test_parse_declaration() {
             ))),
             name: Gid("GC_get_push_other_roots".to_owned()),
             args: vec![],
+            addr_attr: None,
+            addr_space: None,
+            func_attrs: vec![],
+            //| attr_group)*
+            //personality: Option<Personality>,
+            //named_meta*: ???
+        },
+    );
+
+    assert_eq!(
+        Declaration::try_from(
+            LLVMParser::parse(
+                Rule::declare,
+                "declare hidden i1 @llvm.expect.i1(i1, i1) #1",
+            )
+            .unwrap()
+            .next()
+            .unwrap(),
+        )
+        .unwrap(),
+        Declaration {
+            linkage: None,
+            vis: Some(Visibility::Hidden),
+            cconv: None,
+            ret_attrs: vec![],
+            ret: Type::Id("i1".to_owned()),
+            name: Gid("llvm.expect.i1".to_owned()),
+            args: vec![
+                (Type::Id("i1".to_owned()), vec![]),
+                (Type::Id("i1".to_owned()), vec![]),
+            ],
             addr_attr: None,
             addr_space: None,
             func_attrs: vec![],
